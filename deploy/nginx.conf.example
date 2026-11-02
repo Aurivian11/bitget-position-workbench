@@ -1,0 +1,33 @@
+# Replace domain and certificate paths before installation.
+# The TLS private key and certificate are supplied by your certificate manager.
+server {
+    listen 80;
+    server_name monitor.example.com;
+    return 308 https://monitor.example.com$request_uri;
+}
+server {
+    listen 443 ssl;
+    server_name monitor.example.com;
+    ssl_certificate /etc/letsencrypt/live/monitor.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/monitor.example.com/privkey.pem;
+
+    location = /bitget { return 308 /bitget/; }
+    location ^~ /bitget/ {
+        proxy_pass http://127.0.0.1:8091/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Always overwrite these headers. Never pass user-supplied values through.
+        # realip_remote_addr preserves the original TCP peer if realip is enabled.
+        proxy_set_header X-Bitget-Proxy-Peer $realip_remote_addr;
+        proxy_set_header X-Bitget-Client-IP $http_cf_connecting_ip;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 60s;
+        client_max_body_size 16k;
+        proxy_buffering off;
+        proxy_cache off;
+        access_log off;
+        add_header Cache-Control "no-store" always;
+    }
+    location / { return 404; }
+}

@@ -1,0 +1,26 @@
+[Unit]
+Description=Bitget read-only position monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bitgetbot
+Group=bitgetbot
+WorkingDirectory=/opt/bitget-position-workbench
+EnvironmentFile=/opt/bitget-position-workbench/config/.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/bitget-position-workbench/.venv/bin/python -B /opt/bitget-position-workbench/app/bot.py
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/bitget-position-workbench/data
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
