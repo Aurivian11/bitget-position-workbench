@@ -141,4 +141,17 @@ class Audit(unittest.TestCase):
   h=Fake(headers={'Origin':'https://attacker.invalid'});wa.handle(h,None);self.assertEqual(h.status,403)
   h=Fake(peer='203.0.113.10');wa.handle(h,None);self.assertEqual(h.status,403)
 
+ def test_bark_invalid_https_ports_do_not_change_configuration(self):
+  for value in ['https://bark.example.invalid:0','https://bark.example.invalid:65536','https://bark.example.invalid:invalid']:
+   with self.subTest(url=value):
+    ns.SETTINGS.unlink(missing_ok=True)
+    with self.assertRaises(ns.SettingsError):
+     ns.save({'revision':0,'channels':{'bark':{'base':value}}})
+    self.assertFalse(ns.SETTINGS.exists())
+ def test_bark_custom_https_port_remains_supported(self):
+  value='https://bark.example.invalid:8443'
+  saved=ns.save({'revision':0,'channels':{'bark':{'base':value}}})
+  self.assertEqual(saved['channels']['bark']['base'],value)
+  self.assertEqual(saved['revision'],1)
+
 if __name__=='__main__':unittest.main(verbosity=2)

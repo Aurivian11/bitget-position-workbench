@@ -113,7 +113,9 @@ def _validate(channels):
                 if u.scheme!='https' or u.hostname not in {'discord.com','discordapp.com','canary.discord.com','ptb.discord.com'} or u.port not in (None,443) or u.username or u.password or u.query or u.fragment or not re.fullmatch(r'/api(?:/v\d+)?/webhooks/\d{5,25}/[A-Za-z0-9._-]{20,200}',u.path): raise SettingsError('Discord Webhook 地址格式无效')
             if c['enabled'] and not c['webhook']: raise SettingsError('启用 Discord 前请填写 Webhook')
         if name=='bark':
-            u=urlsplit(c['base']); local=u.hostname in {'127.0.0.1','localhost','::1'} and u.port==8080
+            u=urlsplit(c['base']); port=u.port
+            if port is not None and not 1<=port<=65535: raise SettingsError('Bark 地址端口无效')
+            local=u.hostname in {'127.0.0.1','localhost','::1'} and port==8080
             if not u.hostname or u.username or u.password or u.query or u.fragment or (u.path not in {'','/'}) or not (u.scheme=='https' or (u.scheme=='http' and local)): raise SettingsError('Bark 地址须为 HTTPS 根地址，或本机 http://127.0.0.1:8080')
             if c['key'] and not re.fullmatch(r'[A-Za-z0-9_-]{5,200}',c['key']): raise SettingsError('Bark Key 格式无效')
             if c['enabled'] and not c['key']: raise SettingsError('启用 Bark 前请填写设备 Key')
