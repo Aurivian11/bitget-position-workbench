@@ -92,6 +92,24 @@ def normalize_fill(raw, product_type, source):
     }
 
 
+
+def normalize_cfd_opening(raw):
+    """Only confirmed CFD ledger openings can enter the opening-order outbox."""
+    if not isinstance(raw, dict) or raw.get('_cfdOpeningEvent') is not True or raw.get('_accountMode') != 'cfd':
+        return None
+    order_id = str(raw.get('_cfdOpeningOrderId') or raw.get('posId') or '')
+    symbol, direction = str(raw.get('symbol') or ''), raw.get('holdSide')
+    quantity, price = number(raw.get('total')), number(raw.get('openPriceAvg'))
+    fill_ms = millis(raw.get('_cfdOpenedAt'))
+    if not order_id or not symbol or direction not in {'long', 'short'} or quantity <= 0 or price <= 0 or not fill_ms:
+        return None
+    return {'product_type': 'CFD', 'order_id': order_id, 'trade_id': order_id,
+        'symbol': symbol, 'direction': direction, 'price': text_number(price),
+        'quantity': text_number(quantity), 'quantity_label': '本笔成交', 'quantity_unit': '手',
+        'margin_coin': str(raw.get('marginCoin') or 'USD'), 'fill_ms': fill_ms,
+        'status': 'confirmed_fill', 'source': 'rest'}
+
+
 def message_for(event):
     symbol = event["symbol"]
     base = symbol
@@ -109,7 +127,7 @@ def message_for(event):
     body = (
         f"{symbol} · {direction}\n{status}\n"
         f"成交价：{event['price']} {event['margin_coin']}\n"
-        f"{event['quantity_label']}：{event['quantity']} {base}\n"
+        f"{event['quantity_label']}：{event['quantity']} {event.get('quantity_unit') or base}\n"
         f"订单：{event['order_id']}\n"
         f"成交时间：{stamp:%m-%d %H:%M:%S}（北京时间）"
     )
@@ -121,7 +139,11 @@ class BarkOrderDispatcher:
         self.db_path = Path(db_path)
         self.client = client
         self.transport = transport
-        self.products = tuple(client.config.product_types)
+        self.crypto_products = tuple(p for p in client.config.product_types if p != 'CFD')
+        self.cfd = getattr(client, 'cfd', None)
+        self.products = self.crypto_products + (('CFD',) if self.cfd is not None else ())
+        self._next_cfd_at = 0.0
+        self._last_cfd_warning = float('-inf')
         self.account_tag = hashlib.sha256(client.config.api_key.encode()).hexdigest()[:20]
         self.reconcile_seconds = max(5, float(reconcile_seconds))
         self.now_ms = now_ms or (lambda: int(time.time() * 1000))
@@ -216,7 +238,7 @@ class BarkOrderDispatcher:
             self.baseline = int(saved)
             return
         partials = []
-        for product in self.products:
+        for product in self.crypto_products:
             for rows in self._pages(product, PENDING_PATH, {"status": "partially_filled"}, "entrustedList"):
                 for raw in rows:
                     if getattr(self.client, 'uta', False):
@@ -283,7 +305,7 @@ class BarkOrderDispatcher:
         self._wake.set()
 
     def reconcile(self):
-        for product in self.products:
+        for product in self.crypto_products:
             previous = int(self._get_meta("watermark:" + product) or self.baseline)
             start = max(self.baseline, previous - OVERLAP_MS)
             end = min(self.now_ms(), start + WEEK_MS - 1)
@@ -298,6 +320,25 @@ class BarkOrderDispatcher:
             # Never advance on a failed or incomplete page, or from a websocket event.
             self._set_meta("watermark:" + product, end)
             self._set_meta("last_rest_ok", self.now_ms())
+
+    def reconcile_cfd(self):
+        if self.cfd is None:
+            return
+        for raw in self.cfd.opening_events():
+            self.record(normalize_cfd_opening(raw))
+        self._set_meta('last_cfd_rest_ok', self.now_ms())
+
+    def _poll_cfd(self):
+        if self.cfd is None or time.monotonic() < self._next_cfd_at:
+            return
+        self._next_cfd_at = time.monotonic() + 5.0
+        try:
+            self.reconcile_cfd()
+        except Exception as error:
+            now = time.monotonic()
+            if now - self._last_cfd_warning >= 60:
+                self._last_cfd_warning = now
+                LOG.warning('Bark CFD reconciliation delayed; crypto continues (%s)', type(error).__name__)
 
     def deliver_pending(self):
         with self._connect() as db:
@@ -350,6 +391,7 @@ class BarkOrderDispatcher:
                     continue
                 LOG.info("Bark opening-fill observer enabled for %s", ",".join(self.products))
             try:
+                self._poll_cfd()
                 self.deliver_pending()
                 if time.monotonic() >= next_reconcile or self._reconcile_requested.is_set():
                     self._reconcile_requested.clear()

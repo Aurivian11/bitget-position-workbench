@@ -16,6 +16,10 @@ def identity(item):
     created = int(item.get('cTime') or item.get('ctime') or history.get('ctime') or 0)
     if not product or not symbol or side not in {'long', 'short'} or not coin or created <= 0:
         raise ValueError('Position lifetime identity is incomplete')
+    if product == "CFD":
+        pid = str(item.get("posId") or item.get("positionId") or history.get("positionId") or "")
+        if not pid: raise ValueError("CFD position ID is required")
+        return (product, symbol, side, coin, created, pid)
     return (product, symbol, side, coin, created)
 
 def same_lifetime(left, right):

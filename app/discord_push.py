@@ -191,7 +191,16 @@ class DiscordDispatcher:
                     delivered += 1
                     continue
             if row["event_type"] in {"opened", "updated"}:
-                # Opening and parameter changes use the live board; size changes notify separately.
+                # CFD ledger recovery can find a trade after it has already closed.
+                after = json.loads(row["after_json"]) if row["after_json"] else {}
+                if row["event_type"] == "opened" and after.get("_accountMode") == "cfd" and notification_settings.board_enabled("discord"):
+                    board = self._get_trade_board()
+                    if board is not None and not board.was_visible(after):
+                        current = self.positions_provider() if self.positions_provider else self._snapshot()[0]
+                        if any(str(p.get("posId")) == str(after.get("posId")) and p.get("productType") == "CFD" for p in current.values()):
+                            board.sync(current)
+                        else:
+                            board.open_notice(after)
                 with self._connect() as db:
                     db.execute(
                         "INSERT INTO discord_event_delivery(event_id,html,complete,updated_at) "

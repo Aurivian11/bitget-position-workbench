@@ -209,7 +209,7 @@ class DashboardData:
                             before = json.loads(raw) if raw else {}
                             history = before.get("_history") if isinstance(before, dict) else None
                             product = before.get("productType") if isinstance(before, dict) else None
-                            if product in self.config.product_types and bot.history_complete(history):
+                            if product in bot.monitored_products(self.config) and bot.history_complete(history):
                                 records.append(dict(history, productType=product))
                         except (TypeError, ValueError):
                             continue

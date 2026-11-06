@@ -185,7 +185,7 @@ def prepare_runtime(db_path):
             if name in {'telegram','discord'} and changed:
                 if 'trade_message_delivery' in tables:
                     suffix=':archived:'+str(time.time_ns())
-                    db.execute('UPDATE trade_message_delivery SET channel=channel||? WHERE channel IN (?,?)',(suffix,name,name+':closed'))
+                    db.execute('UPDATE trade_message_delivery SET channel=channel||? WHERE channel IN (?,?,?,?)',(suffix,name,name+':closed',name+':aggregate',name+':opened'))
                 keys=('pnl_message_parts','pnl_message_id') if name=='telegram' else ('discord_pnl_message_ids',)
                 for key in keys: db.execute('DELETE FROM metadata WHERE key=?',(key,))
             if name=='telegram' and (reset or not c['enabled']):

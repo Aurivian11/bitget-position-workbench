@@ -67,6 +67,8 @@ class Telegram:
                 "message can not be edited", "message cannot be edited",
             )):
                 raise TelegramMessageMissing("Telegram target message is unavailable for editing") from None
+        if code == 400 and method == "deleteMessage" and "message to delete not found" in description:
+            raise TelegramMessageMissing("Telegram target message was already deleted") from None
         raise TelegramError(
             f"Telegram API request failed (HTTP/API {code})",
             delivery_unknown=(method == "sendMessage" and code >= 500),
@@ -177,3 +179,6 @@ class Telegram:
             "parse_mode": "HTML",
             "disable_web_page_preview": "true",
         })
+
+    def delete(self, message_id: int) -> None:
+        self._post("deleteMessage", {"chat_id": self.chat_id, "message_id": str(message_id)})

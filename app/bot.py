@@ -135,6 +135,8 @@ def sign(secret: str, timestamp: str, method: str, path: str, query: str = "", b
 
 
 def position_key(item: dict[str, Any]) -> str:
+    if item.get("productType") == "CFD":
+        return ":".join(str(item.get(k) or "") for k in ("productType", "symbol", "holdSide", "marginCoin", "posId"))
     return ":".join((
         str(item.get("productType", "")),
         str(item.get("symbol", "")),
@@ -172,6 +174,14 @@ class BitgetTimestampExpired(RuntimeError):
     """A WebSocket login rejected because its request timestamp expired."""
 
 
+def cfd_enabled():
+    return os.getenv("BITGET_CFD_ENABLED", "0").lower() in {"1", "true", "yes"}
+
+
+def monitored_products(config):
+    return (*config.product_types, "CFD") if cfd_enabled() else config.product_types
+
+
 def use_uta_api():
     mode = os.getenv("BITGET_ACCOUNT_MODE", "classic").strip().lower()
     if mode not in {"classic", "uta"}:
@@ -190,6 +200,10 @@ class BitgetClient:
         self.uta = use_uta_api()
         self.position_costs = (UTAPositionCostCache if self.uta else PositionCostCache)(self._get)
         self._tpsl_warning_at = float("-inf")
+        self.cfd = None
+        if cfd_enabled():
+            from cfd_adapter import get_cfd_adapter
+            self.cfd = get_cfd_adapter(self)
 
     def _get(self, params: dict[str, str], path: str | None = None) -> Any:
         path = path or self.PATH
@@ -233,6 +247,12 @@ class BitgetClient:
             return payload.get("data") or []
 
     def positions(self) -> dict[str, dict[str, Any]]:
+        result = self._crypto_positions()
+        if getattr(self, "cfd", None) is not None:
+            result.update(self.cfd.positions())
+        return result
+
+    def _crypto_positions(self) -> dict[str, dict[str, Any]]:
         if self.uta:
             return self.uta_positions()
         result = {}
@@ -277,6 +297,9 @@ class BitgetClient:
         return result
 
     def history_positions(self, product_type: str) -> list[dict[str, Any]]:
+        if product_type == "CFD":
+            if self.cfd is None: raise ValueError("CFD monitoring is disabled")
+            return self.cfd.history_positions()
         if self.uta:
             rows = unwrap_list(self._get({"category": product_type, "limit": "100"}, "/api/v3/position/history-position"))
             return [normalize_history(row, product_type) for row in rows]
@@ -287,6 +310,9 @@ class BitgetClient:
         return (data or {}).get("list") or []
 
     def accounts(self, product_type: str) -> list[dict[str, Any]]:
+        if product_type == "CFD":
+            if self.cfd is None: raise ValueError("CFD monitoring is disabled")
+            return self.cfd.accounts()
         if self.uta:
             data = self._get({}, "/api/v3/account/assets")
             if not isinstance(data, dict) or not isinstance(data.get("assets"), list):
@@ -450,13 +476,34 @@ class Store:
         return reconcile_closed_records(self.db, product_type, records, start_ms, now, history_position_key)
 
 
+def recover_cfd_openings(client, store, positions, events):
+    """Recover ledger-only rapid opens without replaying an observed lifetime."""
+    if getattr(client, "cfd", None) is None:
+        return events
+    from trade_messages import identity
+    known = set()
+    for (raw,) in store.db.execute("SELECT after_json FROM position_events WHERE event_type='opened' AND after_json IS NOT NULL"):
+        item = json.loads(raw)
+        if item.get('productType') == 'CFD': known.add(identity(item))
+    for kind, _, _, after in events:
+        if kind == 'opened' and after and after.get('productType') == 'CFD': known.add(identity(after))
+    for item in client.cfd.opening_events():
+        key = identity(item)
+        if key in known: continue
+        item = dict(item)
+        item['_notifyOpening'] = position_key(item) not in positions
+        events.append(('opened', position_key(item), None, item))
+        known.add(key)
+    return events
+
+
 def reconcile_history_positions(
     client: BitgetClient,
     store: Store,
     start_ms: int,
 ) -> int:
     added = 0
-    for product_type in client.config.product_types:
+    for product_type in monitored_products(client.config):
         added += store.record_history_positions(
             product_type,
             client.history_positions(product_type),
@@ -483,7 +530,7 @@ def fee_rebate_percent() -> str:
 
 
 def current_fee_rebate(item) -> Decimal:
-    return abs(decimal(item.get("deductedFee"))) * fee_rebate_rate()
+    return abs(decimal(item.get("deductedFee"))) * (Decimal("0") if item.get("_accountMode") == "cfd" else fee_rebate_rate())
 
 
 def history_fee_rebate(item) -> Decimal:
@@ -491,7 +538,7 @@ def history_fee_rebate(item) -> Decimal:
         abs(decimal(item.get("openFee")))
         + abs(decimal(item.get("closeFee")))
     )
-    return transaction_fee * fee_rebate_rate()
+    return transaction_fee * (Decimal("0") if item.get("_accountMode") == "cfd" else fee_rebate_rate())
 
 
 def history_net_pnl(item) -> Decimal:
@@ -499,6 +546,9 @@ def history_net_pnl(item) -> Decimal:
 
 
 def current_net_pnl(item) -> Decimal | None:
+    if item.get("_accountMode") == "cfd":
+        value = item.get("_cfdNetPnl")
+        return Decimal(str(value)) if value is not None else None
     if item.get("_utaPnlAmbiguous"):
         return None
     transaction_fee = abs(decimal(item.get("deductedFee")))
@@ -518,7 +568,7 @@ def roi(item, net: bool = False) -> str:
 
 
 def holding_duration(item, closed: bool = False, now_ms: int | None = None) -> str:
-    start = decimal(item.get("ctime") or item.get("cTime"))
+    start = decimal(item.get("_cfdOpenedAt")) if item.get("_accountMode") == "cfd" else decimal(item.get("ctime") or item.get("cTime"))
     if start <= 0:
         return "-"
     if closed:
@@ -635,6 +685,8 @@ def format_position_lines(item, *, closed=False) -> list[str]:
     leverage = source.get("leverage") or item.get("leverage")
     leverage_text = display_number(leverage)
     title = f"{h(symbol)} · {h(side)}"
+    if item.get("_accountMode") == "cfd" or source.get("_accountMode") == "cfd":
+        title += " · CFD"
     if leverage_text != "—":
         title += f" · {h(leverage_text)}×"
     if closed:
@@ -671,6 +723,13 @@ def format_position_lines(item, *, closed=False) -> list[str]:
         fee = display_number(-abs(decimal(item.get("deductedFee"))), money=True, signed=True)
         rebate = display_number(current_fee_rebate(item), money=True, signed=True)
         funding = display_number(item.get("totalFee"), money=True, signed=True)
+    is_cfd = item.get("_accountMode") == "cfd" or source.get("_accountMode") == "cfd"
+    if is_cfd:
+        rebate = "—"
+        quantity += " 手"
+        if not closed and item.get("deductedFee") is None: fee = "—"
+        if not closed: second_label = "可平仓报价"
+    funding_label = "隔夜利息" if is_cfd else "资金费"
     if net is None:
         pnl_line = "<b>⏳ 净盈亏：待结算</b>" if closed else "<b>⚪ 净盈亏：</b><code>—</code>"
     else:
@@ -690,12 +749,12 @@ def format_position_lines(item, *, closed=False) -> list[str]:
         f"🟣 盈亏持平价格：<code>{h(display_number(net_break_even_price(item)))}</code>",
         f"止盈/止损：<code>{h(take_profit)}</code> / <code>{h(stop_loss)}</code>",
         f"数量：<code>{h(quantity)}</code>  ·  持仓：<code>{h(duration)}</code>",
-        f"手续费：<code>{h(fee)}</code>  ·  返佣：<code>{h(rebate)}</code>  ·  资金费：<code>{h(funding)}</code>",
+        f"手续费：<code>{h(fee)}</code>  ·  返佣：<code>{h(rebate)}</code>  ·  {funding_label}：<code>{h(funding)}</code>",
     ]
 
 
 def format_opened_event(item) -> str:
-    opened_at = display_closed_time(item.get("cTime") or item.get("ctime"))
+    opened_at = display_closed_time(item.get("_cfdOpenedAt")) if item.get("_accountMode") == "cfd" else display_closed_time(item.get("cTime") or item.get("ctime"))
     return "\n".join([
         "<b>📊 BITGET · 已开仓</b>",
         f"开仓时间：{h(opened_at)}（北京时间）",
@@ -1130,34 +1189,38 @@ def request_bark_reconcile(bark):
 
 def make_telegram_trade_board(store, telegram):
     from contextlib import nullcontext
-    from trade_messages import TradeMessageBoard
+    from aggregate_board import AggregateTradeMessageBoard
     def checked(text):
         if len(text) > 3800:
-            raise ValueError("One position message exceeds Telegram's size limit")
+            raise ValueError("Combined positions exceed Telegram's message size limit")
         return text
-    return TradeMessageBoard(
+    return AggregateTradeMessageBoard(
         lambda: nullcontext(store.db), "telegram", telegram.send,
         lambda mid, text: telegram.edit(int(mid), text),
         lambda error: isinstance(error, TelegramMessageMissing),
         lambda error: isinstance(error, TelegramError) and not error.delivery_unknown,
-        lambda item: checked(format_pnl_report({position_key(item): item})),
+        lambda positions: checked(format_pnl_report(positions)),
         lambda item: checked(format_closed_event(item)),
+        lambda mid: telegram.delete(int(mid)),
+        format_opened=lambda item: checked(format_opened_event(item)),
     )
 
 
 def make_discord_trade_board(dispatcher):
-    from trade_messages import TradeMessageBoard
+    from aggregate_board import AggregateTradeMessageBoard
     from discord_webhook import board_payloads, event_payloads, DiscordError
     def single(payloads):
         if len(payloads) != 1:
-            raise ValueError("One position message exceeds Discord's size limit")
+            raise ValueError("Combined positions exceed Discord's message size limit")
         return payloads[0]
-    return TradeMessageBoard(
+    return AggregateTradeMessageBoard(
         dispatcher._connect, "discord", dispatcher.transport.send, dispatcher.transport.edit,
         dispatcher._missing_message,
         lambda error: isinstance(error, DiscordError) and error.status in {400,401,403,404,405,413,429},
-        lambda item: single(board_payloads(format_pnl_report({position_key(item): item}))),
+        lambda positions: single(board_payloads(format_pnl_report(positions))),
         lambda item: single(event_payloads(format_closed_event(item))),
+        dispatcher.transport.delete,
+        format_opened=lambda item: single(event_payloads(format_opened_event(item))),
     )
 
 
@@ -1250,6 +1313,7 @@ def run() -> None:
             positions = client.positions()
             previous = store.load_state()
             events = detect_events(previous, positions) if store.initialized() else []
+            events = recover_cfd_openings(client, store, positions, events)
             if any(kind == "closed" for kind, _, _, _ in events):
                 events = enrich_closed_events(client, events)
             snapshot = time.monotonic() - last_snapshot >= config.snapshot_seconds
@@ -1277,7 +1341,8 @@ def run() -> None:
             LOG.exception("monitor cycle failed (%s)", failures)
             if failures == 3:
                 queue_discord_notice(discord, "<b>[BITGET 监控异常]</b>\n连续 3 次监控循环失败，请检查服务日志。")
-        remaining = config.poll_seconds - (time.monotonic() - started)
+        interval = min(config.poll_seconds, 2) if client.cfd is not None else config.poll_seconds
+        remaining = interval - (time.monotonic() - started)
         if remaining > 0 and not STOP:
             try:
                 signals.get(timeout=remaining)

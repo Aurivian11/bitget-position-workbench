@@ -28,11 +28,13 @@ Bitget Position Workbench 是一个可自行部署的只读持仓监控项目。
 
 ### 三种通知方式
 
-- **Telegram**：开仓与持仓参数变化通过可编辑持仓卡片展示；可另外启用加仓、减仓、平仓事件。
-- **Discord**：通过 Webhook 更新持仓卡片，并发送所选交易事件。
+- **Telegram**：多个当前持仓合并到同一条可编辑消息，持续更新；可另外启用加仓、减仓、平仓事件。
+- **Discord**：通过 Webhook 更新合并持仓消息，并发送所选交易事件；渠道可单独关闭。
 - **Bark**：用于开仓方向成交提醒，包含加仓成交；支持设备 Key、声音、分组与持续响铃配置。
 
-卡片刷新间隔与事件通知分别调度。待结算的旧平仓记录不会挡住新加减仓事件，未完成记录仍会保留并重试。
+卡片刷新间隔与事件通知分别调度。待结算的旧平仓记录不会挡住新加减仓事件，未完成记录仍会保留并重试。 平仓等待完整结算后另发结果，关闭一个仓位不会停止其他持仓更新。
+
+CFD 可通过 `BITGET_CFD_ENABLED=1` 单独启用，使用独立持仓接口与成交账本补查；短时间内开平仓也会核对开仓记录。配置、字段差异和匹配边界见[CFD 监控说明](docs/NOTIFICATIONS.md#cfd-监控)。
 
 ## 技术组成
 
@@ -86,6 +88,7 @@ sudo chmod 0600 config/.env
 | --- | --- |
 | `BITGET_API_KEY` / `BITGET_API_SECRET` / `BITGET_API_PASSPHRASE` | 你自己的 Bitget 只读 API 三项凭据 |
 | `BITGET_ACCOUNT_MODE` | `classic` 或 `uta`，与账户类型一致 |
+| `BITGET_CFD_ENABLED` | 可选 CFD 监控，默认 `0`；启用设为 `1` |
 | `BITGET_WEB_ORIGIN` | 正式 HTTPS 来源，例如 `https://monitor.example.com`，不含路径 |
 | `BITGET_WEB_TRUSTED_PROXIES` | 直接连接网页进程的可信代理 IP；同机 Nginx 使用默认 `127.0.0.1,::1` |
 
@@ -177,6 +180,8 @@ curl http://127.0.0.1:8091/healthz
 ```text
 app/
   bot.py                         # 持仓检测、事件状态与监控入口
+  aggregate_board.py             # 多持仓单消息、迁移及投递去重
+  cfd_adapter.py                 # CFD 独立接口、成交账本与结算匹配
   web_app.py                     # 账户/持仓数据与网页服务
   web_admin.py                   # 全站登录、会话及管理接口
   notification_settings.py       # 通知校验、原子保存与加载确认
@@ -211,7 +216,7 @@ PYTHONPATH=app .venv/bin/python -B -m unittest discover -s tests -v
 PYTHONPATH=app .venv/bin/python -B app/test_bot.py
 ```
 
-离线测试覆盖通知调度与公平队列、配置并发和无变更保存、密钥脱敏、认证与 CSRF、代理头伪造、会话撤销等。测试使用虚构凭据和隔离数据库，不发送真实通知或交易请求。
+离线测试覆盖多持仓合并、CFD 快速开平仓与账本匹配、通知调度与公平队列、配置并发和无变更保存、密钥脱敏、认证与 CSRF、代理头伪造、会话撤销等。测试使用虚构凭据和隔离数据库，不发送真实通知或交易请求。
 
 ## 第三方依赖与项目关系
 

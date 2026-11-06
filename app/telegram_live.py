@@ -119,6 +119,14 @@ class TelegramLiveDispatcher:
                 continue
             # Opening and parameter changes use the editable board; size changes notify separately.
             if row["event_type"] in {"opened", "updated"}:
+                after = json.loads(row["after_json"]) if row["after_json"] else {}
+                if row["event_type"] == "opened" and after.get("_accountMode") == "cfd" and self.trade_board is not None and notification_settings.board_enabled("telegram"):
+                    if not self.trade_board.was_visible(after):
+                        current = self.positions_provider()
+                        if any(str(p.get("posId")) == str(after.get("posId")) and p.get("productType") == "CFD" for p in current.values()):
+                            self.trade_board.sync(current)
+                        else:
+                            self.trade_board.open_notice(after)
                 store.mark_sent(row["id"])
                 continue
             if row["event_type"] == "closed":
