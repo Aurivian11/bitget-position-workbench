@@ -192,6 +192,24 @@ class DashboardData:
             return False
         return True
 
+    def cfd_web_history(self):
+        # The notification activation timestamp must not hide the user's
+        # previously settled trades from the read-only web ledger.
+        from cfd_adapter import settled_trades
+        with sqlite3.connect(f"file:{self.config.db_path}?mode=ro", uri=True, timeout=5) as db:
+            saved = db.execute("SELECT payload FROM cfd_financial_records ORDER BY ts").fetchall()
+        records = settled_trades([json.loads(row[0]) for row in saved])
+        if not records:
+            return []
+        accounts = self.client.accounts("CFD")
+        if len(accounts) != 1 or not accounts[0].get("marginCoin"):
+            raise ValueError("CFD account currency unavailable")
+        currency = accounts[0]["marginCoin"]
+        for item in records:
+            item["marginCoin"] = currency
+            item["_cfdOpenedAt"] = item["ctime"]
+        return records
+
     def history(self):
         now = time.monotonic()
         with self._lock:
@@ -213,20 +231,28 @@ class DashboardData:
                                 records.append(dict(history, productType=product))
                         except (TypeError, ValueError):
                             continue
-                for product_type in self.config.product_types:
-                    if self.client.uta:
-                        data = self.client._get({"category": product_type, "limit": str(self.history_limit)}, "/api/v3/position/history-position")
-                        rows = [bot.normalize_history(item, product_type) for item in bot.unwrap_list(data)]
-                    else:
-                        data = self.client._get(
-                            {"productType": product_type, "limit": str(self.history_limit)},
-                            self.client.HISTORY_PATH,
-                        )
-                        rows = (data or {}).get("list") or []
-                    for item in rows:
-                        record = dict(item)
-                        record["productType"] = product_type
-                        records.append(record)
+                product_errors = []
+                for product_type in bot.monitored_products(self.config):
+                    try:
+                        if product_type == "CFD":
+                            rows = self.cfd_web_history()
+                        elif self.client.uta:
+                            data = self.client._get({"category": product_type, "limit": str(self.history_limit)}, "/api/v3/position/history-position")
+                            rows = [bot.normalize_history(item, product_type) for item in bot.unwrap_list(data)]
+                        else:
+                            data = self.client._get(
+                                {"productType": product_type, "limit": str(self.history_limit)},
+                                self.client.HISTORY_PATH,
+                            )
+                            rows = (data or {}).get("list") or []
+                        for item in rows:
+                            record = dict(item)
+                            record["productType"] = product_type
+                            records.append(record)
+                    except Exception as exc:
+                        LOG.warning("%s history unavailable (%s)", product_type, type(exc).__name__)
+                        product_errors.append(("CFD" if product_type == "CFD" else "合约") + "历史暂时不可用")
+                        records.extend(item for item in self._history if item.get("productType") == product_type)
                 if self.client.uta:
                     records = list({bot.history_position_key(item["productType"], item): item for item in records}.values())
                 records = [
@@ -236,7 +262,7 @@ class DashboardData:
                 records.sort(key=lambda item: int(item.get("utime") or 0), reverse=True)
                 self._history = records[: self.history_limit]
                 self._history_at = now
-                self._history_error = None
+                self._history_error = "；".join(product_errors) or None
             except Exception as exc:
                 LOG.warning("history refresh failed: %s", exc)
                 self._history_error = "历史数据暂时不可用"
@@ -251,14 +277,20 @@ class DashboardData:
                 return list(self._accounts), self._account_error
             try:
                 records = []
-                for product_type in self.config.product_types:
-                    for item in self.client.accounts(product_type):
-                        record = dict(item)
-                        record["productType"] = product_type
-                        records.append(record)
+                product_errors = []
+                for product_type in bot.monitored_products(self.config):
+                    try:
+                        for item in self.client.accounts(product_type):
+                            record = dict(item)
+                            record["productType"] = product_type
+                            records.append(record)
+                    except Exception as exc:
+                        LOG.warning("%s account unavailable (%s)", product_type, type(exc).__name__)
+                        product_errors.append(("CFD" if product_type == "CFD" else "合约") + "余额暂时不可用")
+                        records.extend(item for item in self._accounts if item.get("productType") == product_type)
                 self._accounts = records
                 self._accounts_at = now
-                self._account_error = None
+                self._account_error = "；".join(product_errors) or None
             except Exception as exc:
                 LOG.warning("account refresh failed: %s", exc)
                 self._account_error = "账户余额暂时不可用"
@@ -319,38 +351,45 @@ class DashboardData:
             coin = coin_for(item)
             net = bot.current_net_pnl(item)
             gross = bot.decimal(item.get("unrealizedPL"))
-            margin = bot.decimal(item.get("marginSize"))
+            is_cfd = item.get("productType") == "CFD"
+            margin = finite_decimal(item.get("marginSize")) if is_cfd else bot.decimal(item.get("marginSize"))
             previous = current_totals.get(coin, Decimal("0"))
             current_totals[coin] = None if net is None or previous is None else previous + net
-            total_margin[coin] = total_margin.get(coin, Decimal("0")) + margin
-            fee = -abs(bot.decimal(item.get("deductedFee")))
+            previous_margin = total_margin.get(coin, Decimal("0"))
+            total_margin[coin] = None if margin is None or previous_margin is None else previous_margin + margin
+            fee_value = finite_decimal(item.get("deductedFee")) if is_cfd else bot.decimal(item.get("deductedFee"))
+            fee = -abs(fee_value) if fee_value is not None else None
             rebate = bot.current_fee_rebate(item)
             current.append({
                 "symbol": str(item.get("symbol") or "-"),
                 "productType": str(item.get("productType") or ""),
+                "positionId": str(item.get("posId") or item.get("positionId") or ""),
+                "quantityUnit": "手" if is_cfd else "",
+                "feeRebateRate": "0" if is_cfd else str(bot.fee_rebate_rate()),
+                "quoteMode": "snapshot" if is_cfd else "live",
                 "quoteUpdatedAt": item.get("_quoteUpdatedAt"),
                 "quoteHealthy": bool(item.get("_quoteHealthy")),
                 "side": bot.side_name(item.get("holdSide")),
                 "sideRaw": str(item.get("holdSide") or ""),
                 "size": decimal_text(item.get("total")),
-                "leverage": decimal_text(item.get("leverage")),
+                "leverage": (str(finite_decimal(item.get("leverage"))) if finite_decimal(item.get("leverage")) is not None else None) if is_cfd else decimal_text(item.get("leverage")),
                 "marginMode": str(item.get("marginMode") or "-"),
                 "openPrice": decimal_text(item.get("openPriceAvg")),
-                "markPrice": decimal_text(item.get("markPrice")),
+                "markPrice": (str(finite_decimal(item.get("markPrice"))) if finite_decimal(item.get("markPrice")) is not None else None) if is_cfd else decimal_text(item.get("markPrice")),
                 "holdingTime": bot.holding_duration(item, now_ms=now_ms),
                 "unrealizedPnl": str(gross),
                 "realizedPnl": decimal_text(item.get("achievedProfits")),
-                "transactionFee": str(fee),
+                "transactionFee": str(fee) if fee is not None else None,
                 "fundingFee": decimal_text(item.get("totalFee")),
                 "rebate": str(rebate),
                 "netPnl": str(net) if net is not None else "—",
                 "grossRoi": bot.roi(item),
                 "netRoi": bot.roi(item, net=True),
-                "margin": str(margin),
+                "margin": str(margin) if margin is not None else None,
                 "coin": coin,
                 "takeProfit": str(item.get("takeProfit") or "-"),
                 "stopLoss": str(item.get("stopLoss") or "-"),
-                "openedAt": timestamp_iso(item.get("cTime") or item.get("ctime")),
+                "openedAt": timestamp_iso(item.get("_cfdOpenedAt") if is_cfd else item.get("cTime") or item.get("ctime")),
             })
 
         return {
@@ -363,7 +402,7 @@ class DashboardData:
             "quotesHealthy": all(item["quoteHealthy"] for item in current),
             "positions": current,
             "currentTotals": [
-                {"coin": coin, "netPnl": str(value) if value is not None else "—", "margin": str(total_margin.get(coin, Decimal("0")))}
+                {"coin": coin, "netPnl": str(value) if value is not None else "—", "margin": str(total_margin.get(coin, Decimal("0"))) if total_margin.get(coin) is not None else None}
                 for coin, value in sorted(current_totals.items())
             ],
         }
@@ -373,6 +412,12 @@ class DashboardData:
         accounts, account_error = self.accounts()
         live = self.positions_payload()
 
+        # Summary amounts always have one settlement currency; USD CFD PnL
+        # must never be added to USDT futures PnL.
+        summary_coin = self.config.margin_coin or next(
+            (coin_for(item) for item in accounts if item.get("productType") != "CFD"),
+            next((coin_for(item) for item in accounts), "USDT"),
+        )
         profit = Decimal("0")
         loss = Decimal("0")
         net_history = Decimal("0")
@@ -380,19 +425,25 @@ class DashboardData:
         recent = []
         for item in history:
             net = bot.history_net_pnl(item)
-            transaction_fee = -(
-                abs(bot.decimal(item.get("openFee")))
-                + abs(bot.decimal(item.get("closeFee")))
+            transaction_fee = (
+                bot.decimal(item.get("openFee")) + bot.decimal(item.get("closeFee"))
+                if item.get("productType") == "CFD" else
+                -(abs(bot.decimal(item.get("openFee"))) + abs(bot.decimal(item.get("closeFee"))))
             )
             funding_fee = bot.decimal(item.get("totalFunding"))
             rebate = bot.history_fee_rebate(item)
-            net_history += net
-            if net > 0:
-                profit += net
-                wins += 1
-            elif net < 0:
-                loss += abs(net)
+            if coin_for(item) == summary_coin:
+                net_history += net
+                if net > 0:
+                    profit += net
+                    wins += 1
+                elif net < 0:
+                    loss += abs(net)
             recent.append({
+                "productType": str(item.get("productType") or ""),
+                "positionId": str(item.get("positionId") or ""),
+                "quantityUnit": "手" if item.get("productType") == "CFD" else "",
+                "feeRebateRate": "0" if item.get("productType") == "CFD" else str(bot.fee_rebate_rate()),
                 "symbol": str(item.get("symbol") or "-"),
                 "side": bot.side_name(item.get("holdSide")),
                 "sideRaw": str(item.get("holdSide") or ""),
@@ -411,7 +462,7 @@ class DashboardData:
                 "closedAt": timestamp_iso(item.get("utime")),
             })
 
-        trades = len(history)
+        trades = sum(coin_for(item) == summary_coin for item in history)
         if loss > 0:
             factor = f"{profit / loss:.2f}"
         elif profit > 0:
@@ -444,6 +495,7 @@ class DashboardData:
                 for item in accounts
             ],
             "stats": {
+                "coin": summary_coin,
                 "profitFactor": factor,
                 "trades": trades,
                 "wins": wins,

@@ -35,3 +35,12 @@ main{width:auto;max-width:1760px;margin:0 0 0 var(--sidebar);padding:32px 34px 0
 .view-description,.form-hint,.settings-card-footer,.guide-card li,.guide-card .guide-note,.login-card>p,.login-explainer>p,.status-foot,.status-counts span,.panel-heading p,.panel-note,.event-meta,.event-time,.save-description span{color:#6d7a90}.form-hint,.guide-note{font-size:11px}.settings-card-footer{line-height:1.7;gap:10px}.event-panel .ledger-footer{padding-left:25px;padding-right:25px}
 
 .sidebar nav a>svg{display:block}.form-field{scroll-margin-bottom:165px}
+
+/* Keep account scope visible while preserving the existing workbench layout. */
+.account-selection{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 20px;padding:13px 16px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.account-selection>div{display:flex;align-items:center;gap:14px;min-width:0}.account-selection-label{font-size:11px;color:#6d7a90;white-space:nowrap}.account-selection-note{font-size:11px;color:#7a879a;white-space:nowrap}
+.account-switcher{display:flex;gap:6px;flex-wrap:wrap}.account-switcher button{border:1px solid transparent;background:#f4f6fa;color:#68778e;border-radius:7px;padding:8px 13px;font-family:inherit;font-weight:600;font-size:12px;line-height:1.4;cursor:pointer;white-space:nowrap}.account-switcher button.selected{background:#edf1ff;border-color:#cad5fa;color:#3454d1}.account-switcher button:focus-visible{outline:2px solid #3454d1;outline-offset:3px}.account-switcher button:disabled{cursor:wait;opacity:.65}
+.currency-control .currency-symbol{width:auto;min-width:22px;background:none;border-radius:0;color:#7a879a;font-size:10px;white-space:nowrap}.currency-control select{max-width:116px;width:105px}
+@media(max-width:900px){.currency-control .currency-symbol{display:none}.currency-control select{max-width:105px;width:99px}}
+@media(max-width:600px){.account-selection{display:block;margin-bottom:14px;padding:12px}.account-selection>div{align-items:flex-start;gap:10px}.account-selection-label{padding-top:8px;font-size:10px}.account-switcher{gap:5px;flex:1}.account-switcher button{font-size:11px;padding:7px 10px}.account-selection-note{display:block;margin:8px 0 0 50px;font-size:9px}}
+@media(max-width:430px){.workspace-brand small{display:none}}

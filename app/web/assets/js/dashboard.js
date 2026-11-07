@@ -4,6 +4,7 @@ const $ = (id) => document.getElementById(id);
 const state = {
   data: null,
   coin: "USDT",
+  initialAccountApplied: false,
   range: "all",
   query: "",
   side: "all",
@@ -65,6 +66,7 @@ function serverNow() {
 }
 
 function formatDate(value, mode = "full") {
+  if (value === null || value === undefined || value === "") return "—";
   const target = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(target.getTime())) return "—";
   const options = { timeZone: "Asia/Shanghai", hourCycle: "h23" };
@@ -93,19 +95,58 @@ function initializeIcons() {
   if (window.lucide) window.lucide.createIcons();
 }
 
+function isCfd(item) { return item?.productType === "CFD"; }
+function isCfdAccount(coin = state.coin, data = state.data) {
+  return [data?.accounts, data?.positions, data?.history].some(rows => (rows || []).some(item => item.coin === coin && isCfd(item)));
+}
+function quantityText(item) { return formatNumber(item.size, 8) + (isCfd(item) ? " 手" : ""); }
+function roiText(item) {
+  return isCfd(item) && !hasNumber(item.margin) || item.netRoi === null || item.netRoi === undefined || item.netRoi === "" ? "—" : String(item.netRoi);
+}
+function rebateRate(item) { return isCfd(item) ? 0 : hasNumber(item?.feeRebateRate) ? Number(item.feeRebateRate) : numberValue(state.data?.rebateRate); }
+function priceLabel(item) { return isCfd(item) ? "平仓参考价" : "标记价格"; }
+function productLabel(item) { return (item.coin || state.coin) + (isCfd(item) ? " · CFD" : " 永续"); }
+function accountLabel(coin, data = state.data) { return coin + (isCfdAccount(coin, data) ? " · CFD" : " · 合约"); }
+function selectAccount(coin) {
+  state.coin = coin;
+  state.initialAccountApplied = true;
+  state.page = 1;
+  if ($("trade-drawer").open) closeDrawer();
+  $("currency").value = coin;
+  updateView();
+  liveState.next = 0;
+  loadLivePositions();
+}
+function syncAccountControls() {
+  $("currency").value = state.coin;
+  document.querySelectorAll("[data-account-coin]").forEach(button => {
+    const selected = button.dataset.accountCoin === state.coin;
+    button.classList.toggle("selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+  const cfd = isCfdAccount();
+  const rate = cfd ? 0 : numberValue(state.data?.rebateRate);
+  $("rebate-rate").textContent = formatNumber(rate * 100, 0) + "%";
+  $("rebate-note").hidden = cfd;
+  $("cfd-net-note").hidden = !cfd;
+  $("ledger-time-label").textContent = cfd ? "记录时间" : "平仓时间";
+  $("ledger-order").querySelector('[value="latest"]').textContent = cfd ? "最近记录" : "最近平仓";
+  $("ledger-order").querySelector('[value="earliest"]').textContent = cfd ? "最早记录" : "最早平仓";
+}
+
 function baseSymbol(symbol) {
   return String(symbol || "—").replace(/(USDT|USDC|USD)$/u, "");
 }
 
 function contractMarkup(item) {
-  const base = baseSymbol(item.symbol);
+  const base = isCfd(item) ? String(item.symbol || "—") : baseSymbol(item.symbol);
   const side = item.sideRaw === "long" ? "long" : "short";
   const letters = base.match(/[A-Za-z]/g) || Array.from(base);
   const avatar = base === "BTC" ? "₿" : base === "ETH" ? "Ξ" : letters.slice(0, 2).join("").toUpperCase();
   return '<div class="contract-identity">' +
     '<span class="coin-avatar" aria-hidden="true">' + escapeHtml(avatar) + '</span>' +
     '<div class="contract-info"><strong class="contract-name">' + escapeHtml(base) + '</strong>' +
-    '<div class="contract-meta"><span>' + escapeHtml(item.coin || state.coin) + ' 永续</span>' +
+    '<div class="contract-meta"><span>' + escapeHtml(productLabel(item)) + '</span>' +
     '<span class="side ' + side + '"><i data-lucide="' + (side === "long" ? "arrow-up-right" : "arrow-down-right") + '"></i>' +
     (side === "long" ? "做多" : "做空") + '</span></div></div></div>';
 }
@@ -251,13 +292,13 @@ function renderAccount(history, stats) {
   $("win-rate").textContent = formatNumber(stats.rate, 1, true) + "%";
   $("win-rate").dataset.full = $("win-rate").textContent;
   $("win-record").textContent = stats.wins + " 胜 / " + stats.losses + " 负" + (stats.flat ? " / " + stats.flat + " 平" : "");
-  $("rebate-rate").textContent = formatNumber(numberValue(state.data.rebateRate) * 100, 0) + "%";
+  $("rebate-rate").textContent = formatNumber((isCfdAccount() ? 0 : numberValue(state.data.rebateRate)) * 100, 0) + "%";
   $("open-count").textContent = positions.length;
   $("nav-position-count").textContent = positions.length;
   $("nav-trade-count").textContent = history.length;
   $("position-heading-count").textContent = positions.length;
-  if ($("account-product")) $("account-product").textContent = state.data.accountMode === "unified" ? "统一账户 · " + state.coin + " 资产" : state.coin + " 本位永续";
-  if ($("equity-label")) $("equity-label").textContent = state.data.accountMode === "unified" ? "币种资产权益" : "账户总权益";
+  if ($("account-product")) $("account-product").textContent = isCfdAccount() ? "CFD 账户 · " + state.coin : state.data.accountMode === "unified" ? "统一账户 · " + state.coin + " 资产" : state.coin + " 本位永续";
+  if ($("equity-label")) $("equity-label").textContent = isCfdAccount() ? "CFD 账户权益" : state.data.accountMode === "unified" ? "币种资产权益" : "账户总权益";
   if ($("position-summary")) $("position-summary").textContent = positions.length ? "当前币种 " + positions.length + " 个持仓" : "当前未持仓";
   if ($("exposure-label")) $("exposure-label").textContent = positions.length ? "有持仓" : "空仓中";
   if ($("net-period-label")) $("net-period-label").textContent = state.range === "all" ? "累计净盈亏" : "区间净盈亏";
@@ -317,19 +358,19 @@ function renderPositions() {
     const marginMode = item.marginMode === "crossed" ? "全仓" : item.marginMode === "isolated" ? "逐仓" : item.marginMode;
     return '<article class="holding-card" data-position-key="' + escapeHtml(positionKey(item)) + '">' +
       '<div class="holding-head">' + contractMarkup(item) +
-        '<div class="holding-badges"><span class="leverage-badge">' + escapeHtml(formatNumber(item.leverage, 2)) + '×</span><span class="margin-mode-badge">' + escapeHtml(marginMode) + '</span></div>' +
+        '<div class="holding-badges"><span class="leverage-badge">' + escapeHtml(hasNumber(item.leverage) ? formatNumber(item.leverage, 2) + '×' : '—') + '</span><span class="margin-mode-badge">' + escapeHtml(marginMode) + '</span></div>' +
       '</div>' +
-      '<div class="holding-pnl"><div><span class="holding-pnl-label">持仓净盈亏 · ' + escapeHtml(item.coin) + '</span>' +
+      '<div class="holding-pnl"><div><span class="holding-pnl-label">' + (isCfd(item) ? '持仓盈亏 · 含隔夜利息 · ' : '持仓净盈亏 · ') + escapeHtml(item.coin) + '</span>' +
         '<strong data-live-value="netPnl" class="holding-pnl-amount ' + tone(item.netPnl) + '" title="' + escapeHtml(signed(item.netPnl, 8)) + '">' + escapeHtml(signed(item.netPnl, 4)) + '</strong></div>' +
-        '<div class="holding-roi"><span>净收益率</span><strong data-live-value="netRoi" class="' + tone(item.netPnl) + '">' + escapeHtml(item.netRoi) + '</strong></div>' +
+        '<div class="holding-roi"><span>净收益率</span><strong data-live-value="netRoi" class="' + tone(item.netPnl) + '">' + escapeHtml(roiText(item)) + '</strong></div>' +
       '</div>' +
       '<dl class="holding-facts">' +
         '<div class="holding-fact"><dt>开仓均价</dt><dd>' + escapeHtml(formatNumber(item.openPrice, 8)) + '</dd></div>' +
-        '<div class="holding-fact"><dt>标记价格</dt><dd data-live-value="markPrice">' + escapeHtml(formatNumber(item.markPrice, 8)) + '</dd></div>' +
-        '<div class="holding-fact"><dt>持仓数量</dt><dd>' + escapeHtml(formatNumber(item.size, 8)) + '</dd></div>' +
+        '<div class="holding-fact"><dt>' + priceLabel(item) + '</dt><dd data-live-value="markPrice">' + escapeHtml(formatNumber(item.markPrice, 8)) + '</dd></div>' +
+        '<div class="holding-fact"><dt>持仓数量</dt><dd>' + escapeHtml(quantityText(item)) + '</dd></div>' +
         '<div class="holding-fact"><dt>保证金 · ' + escapeHtml(item.coin) + '</dt><dd data-live-value="margin">' + escapeHtml(formatNumber(item.margin, 8)) + '</dd></div>' +
       '</dl>' +
-      '<div class="holding-footer"><span class="holding-duration"><i data-lucide="timer"></i><span>持仓 <b data-opened="' + escapeHtml(item.openedAt || "") + '" data-fallback="' + escapeHtml(item.holdingTime) + '">' + escapeHtml(positionDuration(item.openedAt, item.holdingTime)) + '</b></span></span>' +
+      '<div class="holding-footer"><span class="holding-duration"><i data-lucide="timer"></i><span>' + (isCfd(item) ? (item.openedAt ? '记录时长 ' : '开仓记录时间未知 ') : '持仓 ') + '<b data-opened="' + escapeHtml(item.openedAt || "") + '" data-fallback="' + escapeHtml(item.holdingTime) + '">' + escapeHtml(positionDuration(item.openedAt, item.holdingTime)) + '</b></span></span>' +
         '<button type="button" class="holding-detail" data-position-detail="' + index + '" aria-label="查看 ' + escapeHtml(item.symbol) + ' 费用与风险详情">费用与风险<i data-lucide="arrow-up-right"></i></button></div>' +
     '</article>';
   }).join("");
@@ -346,7 +387,7 @@ function renderPositions() {
 }
 
 function positionKey(item) {
-  return [item.productType || "", item.symbol, item.coin, item.sideRaw, item.openedAt || ""].join(":");
+  return [item.productType || "", item.positionId || "", item.symbol, item.coin, item.sideRaw, item.openedAt || ""].join(":");
 }
 
 function positionSnapshotTime(data) {
@@ -368,6 +409,16 @@ function renderLiveStatus() {
     label.dataset.status = healthy ? "empty" : "stale";
     $("position-empty").querySelector("h3").textContent = healthy ? "当前暂无持仓" : "上次同步时暂无持仓";
     $("position-empty").querySelector("p").textContent = healthy ? "新持仓会自动显示在这里，盈亏与费用实时更新。" : "数据尚未更新，当前持仓状态需要等待监控恢复后确认。";
+    return;
+  }
+  if (positions.every(item => item.quoteMode === "snapshot" || isCfd(item))) {
+    const time = new Date(state.data.monitorUpdatedAt).getTime();
+    const age = serverNow() - time;
+    const healthy = Boolean(state.data.monitorHealthy) && Number.isFinite(age) && age <= 90000 && !liveState.failed;
+    label.title = "CFD 持仓按监控快照同步，页面每 2 秒读取；盈亏采用交易所返回值";
+    label.dataset.status = healthy ? "live" : "stale";
+    label.textContent = healthy ? "持仓同步 · " + formatDate(time, "time") + " 更新"
+      : liveState.failed ? "持仓连接中断 · 正在重试" : "持仓同步延迟 · 等待更新";
     return;
   }
   const times = positions.map((item) => new Date(item.quoteUpdatedAt).getTime());
@@ -395,8 +446,10 @@ function patchLiveDrawer(positions) {
     } else if (signedFields.has(field)) {
       element.textContent = signed(item[field], 8) + " " + item.coin;
       element.className = tone(item[field]);
+    } else if (field === "size") {
+      element.textContent = quantityText(item);
     } else if (field === "netRoi") {
-      element.textContent = item.netRoi;
+      element.textContent = roiText(item);
     } else {
       element.textContent = formatNumber(item[field], 8) + (field === "margin" ? " " + item.coin : "");
     }
@@ -412,7 +465,7 @@ function patchPositionValues(positions) {
     if (!item) return;
     card.querySelectorAll("[data-live-value]").forEach((element) => {
       const field = element.dataset.liveValue;
-      element.textContent = field === "netPnl" ? signed(item.netPnl, 4) : field === "netRoi" ? item.netRoi : formatNumber(item[field], 8);
+      element.textContent = field === "netPnl" ? signed(item.netPnl, 4) : field === "netRoi" ? roiText(item) : formatNumber(item[field], 8);
       if (field === "netPnl" || field === "netRoi") {
         element.classList.remove("positive", "negative", "neutral");
         element.classList.add(tone(item.netPnl));
@@ -442,7 +495,7 @@ async function loadLivePositions() {
   clearTimeout(liveState.timer);
   liveState.timer = null;
   liveState.loading = true;
-  liveState.next = Date.now() + 1000;
+  liveState.next = Date.now() + (isCfdAccount() ? 2000 : 1000);
   const controller = new AbortController();
   liveState.controller = controller;
   const timeout = setTimeout(() => controller.abort(), 8000);
@@ -478,6 +531,13 @@ async function loadLivePositions() {
   }
 }
 
+function ledgerHistory(window = chartWindow()) {
+  return (state.data?.history || []).filter(item => {
+    const time = item.closedAt ? new Date(item.closedAt).getTime() : NaN;
+    return item.coin === window.coin && Number.isFinite(time) && time >= window.startTime && time < window.endTime + DAY_MS && time <= window.now;
+  });
+}
+
 function filterHistory(history) {
   const query = state.query.toLowerCase();
   return history.filter((item) => {
@@ -487,13 +547,14 @@ function filterHistory(history) {
     const resultMatch = state.result === "all" ||
       (state.result === "win" && value > 0) ||
       (state.result === "loss" && value < 0) ||
-      (state.result === "flat" && value === 0);
+      (state.result === "flat" && hasNumber(item.netPnl) && value === 0);
     return queryMatch && sideMatch && resultMatch;
   });
 }
 
 function renderLedger(history) {
   const sorted = filterHistory(history).sort((a, b) => {
+    if (state.sort === "netPnl" && hasNumber(a.netPnl) !== hasNumber(b.netPnl)) return hasNumber(a.netPnl) ? -1 : 1;
     const left = state.sort === "closedAt" ? new Date(a.closedAt).getTime() : numberValue(a.netPnl);
     const right = state.sort === "closedAt" ? new Date(b.closedAt).getTime() : numberValue(b.netPnl);
     return (left - right) * state.direction;
@@ -511,8 +572,8 @@ function renderLedger(history) {
   $("trades").innerHTML = visible.map((item, index) =>
     '<tr class="trade-row">' +
       '<td class="trade-contract" data-label="合约 / 方向">' + contractMarkup(item) + '</td>' +
-      '<td class="trade-date" data-label="平仓时间"><time class="cell-stack" datetime="' + escapeHtml(item.closedAt) + '"><strong>' + escapeHtml(formatDate(item.closedAt, "date")) + '</strong><small>' + escapeHtml(formatDate(item.closedAt, "time")) + '</small></time></td>' +
-      '<td class="trade-size num" data-label="数量"><span>' + escapeHtml(formatNumber(item.size, 8)) + '</span></td>' +
+      '<td class="trade-date" data-label="' + (isCfd(item) ? '记录时间' : '平仓时间') + '"><time class="cell-stack" datetime="' + escapeHtml(item.closedAt) + '"><strong>' + escapeHtml(formatDate(item.closedAt, "date")) + '</strong><small>' + escapeHtml(formatDate(item.closedAt, "time")) + '</small></time></td>' +
+      '<td class="trade-size num" data-label="数量"><span>' + escapeHtml(quantityText(item)) + '</span></td>' +
       '<td class="trade-open-price num" data-label="开仓价格"><strong class="price-amount" title="' + escapeHtml(formatNumber(item.openPrice, 8)) + '">' + escapeHtml(formatNumber(item.openPrice, 8)) + '</strong></td>' +
       '<td class="trade-close-price num" data-label="平仓价格"><strong class="price-amount" title="' + escapeHtml(formatNumber(item.closePrice, 8)) + '">' + escapeHtml(formatNumber(item.closePrice, 8)) + '</strong></td>' +
       '<td class="trade-duration num" data-label="持仓时间"><span>' + escapeHtml(item.holdingTime) + '</span></td>' +
@@ -538,45 +599,46 @@ function renderLedger(history) {
 function openDrawer(item, live, trigger) {
   state.focusReturn = trigger;
   state.drawerPositionKey = live ? positionKey(item) : null;
+  const cfd = isCfd(item);
   const sideClass = item.sideRaw === "long" ? "long" : "short";
   const closedOrOpened = live ? item.openedAt : item.closedAt;
   const details = live
     ? [
-      ["持仓数量", formatNumber(item.size, 8), "size"],
+      ["持仓数量", quantityText(item), "size"],
       ["开仓均价", formatNumber(item.openPrice, 8), "openPrice"],
-      ["标记价格", formatNumber(item.markPrice, 8), "markPrice"],
-      ["杠杆 / 模式", formatNumber(item.leverage, 2) + "x / " + (item.marginMode === "crossed" ? "全仓" : item.marginMode === "isolated" ? "逐仓" : item.marginMode)],
-      ["持仓时间", positionDuration(item.openedAt, item.holdingTime), "duration"],
+      [priceLabel(item), formatNumber(item.markPrice, 8), "markPrice"],
+      ["杠杆 / 模式", (hasNumber(item.leverage) ? formatNumber(item.leverage, 2) + "x" : "—") + " / " + (item.marginMode === "crossed" ? "全仓" : item.marginMode === "isolated" ? "逐仓" : item.marginMode || "—")],
+      [cfd ? "记录间隔" : "持仓时间", positionDuration(item.openedAt, item.holdingTime), "duration"],
       ["保证金", formatNumber(item.margin, 8) + " " + item.coin, "margin"],
-      ["净收益率", item.netRoi, "netRoi"],
+      ["净收益率", roiText(item), "netRoi"],
       ["止盈价格", formatNumber(item.takeProfit, 8), "takeProfit"],
       ["止损价格", formatNumber(item.stopLoss, 8), "stopLoss"],
     ]
     : [
-      ["平仓数量", formatNumber(item.size, 8)],
+      ["平仓数量", quantityText(item)],
       ["开仓均价", formatNumber(item.openPrice, 8)],
       ["平仓均价", formatNumber(item.closePrice, 8)],
-      ["持仓时间", item.holdingTime],
+      [cfd ? "记录间隔" : "持仓时间", item.holdingTime],
     ];
   const fees = live
     ? [
       ["未实现盈亏", item.unrealizedPnl, "unrealizedPnl"],
       ["已实现盈亏", item.realizedPnl, "realizedPnl"],
       ["交易手续费", item.transactionFee, "transactionFee"],
-      ["资金费", item.fundingFee, "fundingFee"],
+      [cfd ? "隔夜利息" : "资金费", item.fundingFee, "fundingFee"],
     ]
     : [
       ["已实现盈亏", item.pnl],
       ["交易手续费", item.transactionFee],
-      ["资金费", item.fundingFee],
+      [cfd ? "隔夜利息" : "资金费", item.fundingFee],
       ["交易所净盈亏", item.exchangeNetPnl],
     ];
 
-  $("drawer-title").textContent = live ? "持仓详情" : "平仓详情";
+  $("drawer-title").textContent = cfd ? (live ? "CFD 持仓详情" : "CFD 结算详情") : live ? "持仓详情" : "平仓详情";
   $("drawer-content").innerHTML =
-    '<div class="drawer-symbol"><div><h3>' + escapeHtml(item.symbol) + '</h3><div class="contract-sub"><span>' + escapeHtml(item.coin) + ' 永续</span><span class="side ' + sideClass + '"><i data-lucide="' + (sideClass === "long" ? "arrow-up-right" : "arrow-down-right") + '"></i>' + (sideClass === "long" ? "做多" : "做空") + '</span></div></div>' +
-      '<div class="drawer-time">' + (live ? "开仓时间" : "平仓时间") + '<strong>' + escapeHtml(formatDate(closedOrOpened)) + '</strong></div></div>' +
-    '<div class="drawer-net"><span>扣费后净盈亏 · 含返佣</span><strong class="' + tone(item.netPnl) + '">' + '<span data-live-detail="netPnl">' + escapeHtml(signed(item.netPnl, 8)) + '</span><small>' + escapeHtml(item.coin) + '</small></strong></div>' +
+    '<div class="drawer-symbol"><div><h3>' + escapeHtml(item.symbol) + '</h3><div class="contract-sub"><span>' + escapeHtml(productLabel(item)) + '</span><span class="side ' + sideClass + '"><i data-lucide="' + (sideClass === "long" ? "arrow-up-right" : "arrow-down-right") + '"></i>' + (sideClass === "long" ? "做多" : "做空") + '</span></div></div>' +
+      '<div class="drawer-time">' + (cfd ? (live ? "开仓记录时间" : "记录时间") : live ? "开仓时间" : "平仓时间") + '<strong>' + escapeHtml(formatDate(closedOrOpened)) + '</strong></div></div>' +
+    '<div class="drawer-net"><span>' + (cfd ? (live ? '持仓盈亏 · 含隔夜利息' : '结算净盈亏') : '扣费后净盈亏 · 含返佣') + '</span><strong class="' + tone(item.netPnl) + '">' + '<span data-live-detail="netPnl">' + escapeHtml(signed(item.netPnl, 8)) + '</span><small>' + escapeHtml(item.coin) + '</small></strong></div>' +
     '<div class="detail-columns"><section class="detail-section parameters-section"><h3>交易参数</h3><dl class="detail-grid">' +
       details.map(([label, value, kind]) => '<div><dt>' + escapeHtml(label) + '</dt><dd>' +
         (kind === "duration" ? '<span data-opened="' + escapeHtml(item.openedAt || "") + '" data-fallback="' +
@@ -585,7 +647,7 @@ function openDrawer(item, live, trigger) {
     '</dl></section>' +
     '<section class="detail-section fees-section"><h3>费用核算</h3><dl>' +
       fees.map(([label, value, field]) => '<div class="detail-row"><dt>' + escapeHtml(label) + '</dt><dd' + (field ? ' data-live-detail="' + field + '"' : '') + ' class="' + tone(value) + '">' + escapeHtml(signed(value, 8)) + " " + escapeHtml(item.coin) + '</dd></div>').join("") +
-      '<div class="detail-row rebate-row"><dt>手续费返佣（' + escapeHtml(formatNumber(numberValue(state.data.rebateRate) * 100, 0)) + '%）</dt><dd>' + escapeHtml(rebateText(item.rebate)) + " " + escapeHtml(item.coin) + '</dd></div>' +
+      '<div class="detail-row rebate-row"><dt>手续费返佣（' + escapeHtml(formatNumber(rebateRate(item) * 100, 0)) + '%）</dt><dd>' + escapeHtml(rebateText(item.rebate)) + " " + escapeHtml(item.coin) + '</dd></div>' +
     '</dl></section></div>';
 
   initializeIcons();
@@ -797,13 +859,15 @@ function updateView() {
   const window = chartWindow();
   const history = scopedHistory(window);
   const stats = calculateStats(history);
+  const records = ledgerHistory(window);
+  syncAccountControls();
   state.hoverIndex = -1;
   $("chart-tip").hidden = true;
 
   renderAccount(history, stats);
   renderScore(history, stats);
   renderPositions();
-  renderLedger(history);
+  renderLedger(records);
   renderChart(history, window);
   $("chart-total").textContent = signed(stats.net, 2, true) + " " + state.coin;
   $("chart-total").className = tone(stats.net);
@@ -827,6 +891,17 @@ function updateView() {
     $("ledger-empty").querySelector("h3").textContent = "没有找到相关交易";
     $("ledger-empty").querySelector("p").textContent = "试试其他合约名称，或调整筛选条件。";
   }
+  const incomplete = records.length - history.length;
+  if (incomplete > 0 && !historyUnavailable) {
+    ["net-profit", "average"].forEach(id => setAmount(id, null));
+    ["win-rate", "profit-factor"].forEach(id => { $(id).textContent = "—"; $(id).dataset.full = "—"; });
+    $("win-record").textContent = stats.wins + " 胜 / " + stats.losses + " 负 · " + incomplete + " 笔收益待确认";
+    $("factor-sample").textContent = history.length + " / " + records.length + " 笔收益已确认";
+    $("score-label").textContent = "部分收益待确认";
+    $("range-trades").textContent = history.length + " 笔收益已确认 · " + incomplete + " 笔待确认";
+    $("chart-total").textContent = "部分收益待确认";
+  }
+  if (!historyUnavailable) ["nav-trade-count", "trade-heading-count"].forEach(id => { $(id).textContent = records.length; });
   $("chart-empty").querySelector("strong").textContent = historyUnavailable ? "历史数据尚未读取" : "该区间暂无交易";
   $("chart-empty").querySelector("span").textContent = historyUnavailable ? "连接恢复后自动更新，当前无法确认收益。" : "平仓后，收益轨迹将在这里呈现";
   $("history-start").textContent = "记录起始 " + String(state.data.historyStart || "—").replaceAll("-", ".");
@@ -847,10 +922,18 @@ function populateCurrencies(data) {
     ...(data.history || []).map((item) => item.coin),
   ])].filter(Boolean);
   if (!values.length) values.push("USDT");
+  if (!state.initialAccountApplied) {
+    state.initialAccountApplied = true;
+    if (new URLSearchParams(location.search).get("account")?.toUpperCase() === "CFD" && values.includes("USD") && isCfdAccount("USD", data)) state.coin = "USD";
+  }
   if (!values.includes(state.coin)) state.coin = values[0];
   $("currency").innerHTML = values.map((coin) =>
-    '<option value="' + escapeHtml(coin) + '"' + (coin === state.coin ? " selected" : "") + ">" + escapeHtml(coin) + "</option>"
+    '<option value="' + escapeHtml(coin) + '"' + (coin === state.coin ? " selected" : "") + ">" + escapeHtml(accountLabel(coin, data)) + "</option>"
   ).join("");
+  $("account-switcher").innerHTML = values.map(coin =>
+    '<button type="button" data-account-coin="' + escapeHtml(coin) + '" aria-pressed="' + String(coin === state.coin) + '" class="' + (coin === state.coin ? 'selected' : '') + '">' + escapeHtml(accountLabel(coin, data)) + '</button>'
+  ).join("");
+  $("account-switcher").querySelectorAll("button").forEach(button => button.addEventListener("click", () => selectAccount(button.dataset.accountCoin)));
 }
 
 function renderData(data) {
@@ -947,9 +1030,7 @@ function tick() {
 $("refresh").addEventListener("click", loadDashboard);
 $("retry").addEventListener("click", loadDashboard);
 $("currency").addEventListener("change", (event) => {
-  state.coin = event.target.value;
-  state.page = 1;
-  updateView();
+  selectAccount(event.target.value);
 });
 
 document.querySelectorAll("[data-range]").forEach((button) => {
@@ -968,17 +1049,17 @@ document.querySelectorAll("[data-range]").forEach((button) => {
 $("search").addEventListener("input", (event) => {
   state.query = event.target.value.trim();
   state.page = 1;
-  renderLedger(scopedHistory());
+  renderLedger(ledgerHistory());
 });
 $("side").addEventListener("change", (event) => {
   state.side = event.target.value;
   state.page = 1;
-  renderLedger(scopedHistory());
+  renderLedger(ledgerHistory());
 });
 $("result").addEventListener("change", (event) => {
   state.result = event.target.value;
   state.page = 1;
-  renderLedger(scopedHistory());
+  renderLedger(ledgerHistory());
 });
 $("reset-filter").addEventListener("click", () => {
   state.query = "";
@@ -988,15 +1069,15 @@ $("reset-filter").addEventListener("click", () => {
   $("search").value = "";
   $("side").value = "all";
   $("result").value = "all";
-  renderLedger(scopedHistory());
+  renderLedger(ledgerHistory());
 });
 $("prev").addEventListener("click", () => {
   state.page = Math.max(1, state.page - 1);
-  renderLedger(scopedHistory());
+  renderLedger(ledgerHistory());
 });
 $("next").addEventListener("click", () => {
   state.page += 1;
-  renderLedger(scopedHistory());
+  renderLedger(ledgerHistory());
 });
 
 const sortOrders = {
@@ -1031,7 +1112,7 @@ document.querySelectorAll("[data-sort]").forEach((button) => {
     state.sort = button.dataset.sort;
     state.page = 1;
     updateSortControls();
-    renderLedger(scopedHistory());
+    renderLedger(ledgerHistory());
   });
 });
 $("ledger-order")?.addEventListener("change", (event) => {
@@ -1040,7 +1121,7 @@ $("ledger-order")?.addEventListener("change", (event) => {
   [state.sort, state.direction] = order;
   state.page = 1;
   updateSortControls();
-  renderLedger(scopedHistory());
+  renderLedger(ledgerHistory());
 });
 updateSortControls();
 
