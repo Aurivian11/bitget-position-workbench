@@ -32,7 +32,7 @@ class ConfigurationTests(unittest.TestCase):
         (self.root/'config/.env').write_text('TELEGRAM_BOT_TOKEN=123456789:'+('a'*35)+'\nTELEGRAM_CHAT_ID=-10012345\nDISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/123456789/'+('b'*60)+'\nBARK_KEY=EXAMPLEKEY123\nBARK_BASE=http://127.0.0.1:8080\n')
         self.environment=patch.dict(os.environ,{},clear=True);self.environment.start()
         self.network=patch('urllib.request.urlopen',side_effect=AssertionError('network forbidden'));self.network.start()
-        self.patches=[patch.object(wa,'ORIGIN','https://example.com'),patch.object(wa,'TRUSTED_PROXIES',frozenset({'127.0.0.1','::1'})),patch.object(ns,'PROJECT',self.root),patch.object(ns,'SETTINGS',self.root/'data/web-notification-settings.json'),patch.object(ns,'APPLIED',self.root/'data/web-notification-applied.json'),patch.object(ns,'RUNTIME',self.root/'data/web-notification-runtime.json'),patch.object(wa,'AUTH_PATH',self.root/'config/web-admin.json')]
+        self.patches=[patch.object(wa,'ORIGIN','https://example.com'),patch.object(wa,'TRUSTED_PROXIES',frozenset({'127.0.0.1','::1'})),patch.object(wa,'_ORIGIN_PARTS',__import__('urllib.parse',fromlist=['urlsplit']).urlsplit('https://example.com')),patch.object(ns,'PROJECT',self.root),patch.object(ns,'SETTINGS',self.root/'data/web-notification-settings.json'),patch.object(ns,'APPLIED',self.root/'data/web-notification-applied.json'),patch.object(ns,'RUNTIME',self.root/'data/web-notification-runtime.json'),patch.object(wa,'AUTH_PATH',self.root/'config/web-admin.json')]
         for p in self.patches:p.start()
         ns._CURRENT=None;wa._RATE.clear();wa._GLOBAL_RATE.clear()
     def tearDown(self):

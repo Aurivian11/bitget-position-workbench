@@ -28,14 +28,14 @@ class Audit(unittest.TestCase):
   self.network=patch('urllib.request.urlopen',side_effect=AssertionError('network forbidden'));self.network.start()
   self.originals={name:getattr(ns,name) for name in ['PROJECT','SETTINGS','APPLIED','RUNTIME','_CURRENT']}
   self.old_auth=wa.AUTH_PATH;self.old_origin=wa.ORIGIN;self.old_proxies=wa.TRUSTED_PROXIES
-  wa.ORIGIN='https://example.com';wa.TRUSTED_PROXIES=frozenset({'127.0.0.1','::1'})
+  wa.ORIGIN='https://example.com';wa.TRUSTED_PROXIES=frozenset({'127.0.0.1','::1'});wa._ORIGIN_PARTS=__import__('urllib.parse',fromlist=['urlsplit']).urlsplit('https://example.com')
   ns.PROJECT=self.root;ns.SETTINGS=self.root/'data/settings.json';ns.APPLIED=self.root/'data/applied.json';ns.RUNTIME=self.root/'data/runtime.json';ns._CURRENT=None
   wa.AUTH_PATH=self.root/'config/admin.json';wa._RATE.clear();wa._GLOBAL_RATE.clear();wa._HASH_SLOTS=__import__('threading').BoundedSemaphore(2)
   self.password='isolated-test-password-not-production'
   wa.initialize_auth(self.password)
  def tearDown(self):
   for name,value in self.originals.items():setattr(ns,name,value)
-  wa.AUTH_PATH=self.old_auth;wa.ORIGIN=self.old_origin;wa.TRUSTED_PROXIES=self.old_proxies
+  wa.AUTH_PATH=self.old_auth;wa.ORIGIN=self.old_origin;wa.TRUSTED_PROXIES=self.old_proxies;wa._ORIGIN_PARTS=__import__('urllib.parse',fromlist=['urlsplit']).urlsplit(self.old_origin)
   self.environment.stop();self.network.stop();self.tmp.cleanup()
  def token(self):
   token=wa._signed_session(wa._auth());h=Fake(headers={'Cookie':wa.COOKIE+'='+token})

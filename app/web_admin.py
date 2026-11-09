@@ -12,6 +12,7 @@ import sqlite3
 import threading
 import time
 from http.cookies import SimpleCookie, CookieError
+from pathlib import Path as PathLike
 from urllib.parse import urlparse, urlsplit
 import notification_settings as settings
 
@@ -198,8 +199,6 @@ def notification_status(db_path):
             channels['bark']['lastAcceptedAt']=db.execute('SELECT MAX(sent_at) FROM bark_open_orders WHERE state=\'sent\'').fetchone()[0]
     heartbeat=config.get('monitorHeartbeatAt')
     return {'channels':channels,'revision':config['revision'],'appliedRevision':config['appliedRevision'],'applying':config['applying'],'monitorHeartbeatAt':heartbeat,'monitorHealthy':bool(heartbeat and time.time()-heartbeat<90),'deliveryNote':'待处理来自本机队列；Telegram/Discord 未记录完整失败次数，未知显示为 —。Bark 接受时间仅表示服务器接受，不保证手机已收到。'}
-
-from pathlib import Path as PathLike
 
 def is_authenticated(h):
     """Pure response-wise check for selecting an authenticated HTML view."""
