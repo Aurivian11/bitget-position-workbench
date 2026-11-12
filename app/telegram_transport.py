@@ -5,12 +5,49 @@ import hashlib
 import http.client
 import json
 import math
+import socket
+import ssl
 import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any
+
+
+def _ipv4_create_connection(address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None, *args, **kwargs):
+    """Connect over IPv4 only: this host's IPv6 route to Telegram intermittently stalls."""
+    host, port = address[0], address[1]
+    last_error = None
+    for family, socktype, proto, _, sockaddr in socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM):
+        sock = socket.socket(family, socktype, proto)
+        try:
+            if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
+                sock.settimeout(timeout)
+            if source_address:
+                sock.bind(source_address)
+            sock.connect(sockaddr)
+            return sock
+        except OSError as error:
+            last_error = error
+            sock.close()
+    raise last_error or OSError("no IPv4 address for Telegram API")
+
+
+class _IPv4HTTPSConnection(http.client.HTTPSConnection):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._create_connection = _ipv4_create_connection
+
+
+class _IPv4HTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(_IPv4HTTPSConnection, req, context=self._context)
+
+
+_OPENER = urllib.request.build_opener(_IPv4HTTPSHandler())
+# A stalled request blocks every queued Telegram message; fail fast and retry.
+TELEGRAM_TIMEOUT_CAP = 8
 
 
 class TelegramError(RuntimeError):
@@ -37,13 +74,21 @@ class Telegram:
 
     def __init__(self, token: str, chat_id: str, timeout: int):
         self.base_url = f"https://api.telegram.org/bot{token}"
+        self._path = f"/bot{token}"
+        self._conn = None
+        self._conn_used_at = 0.0
+        self._ssl = ssl.create_default_context()
+        # Optional callback(message_id) after each confirmed sendMessage.
+        self.on_sent = None
         self.chat_id = chat_id
-        self.timeout = timeout
+        self.timeout = min(timeout, TELEGRAM_TIMEOUT_CAP)
         self._lock = threading.RLock()
         self._last_request_started: float | None = None
         self._not_before = 0.0
         # Retain only completed chunk count and ID, never the message content.
         self._send_progress: dict[bytes, tuple[int, Any]] = {}
+        # Newest message this process created; lets the board know it is buried.
+        self.last_message_id: int | None = None
 
     def _handle_error(self, method: str, code: int, payload: dict) -> dict:
         description = str(payload.get("description", "")).lower()
@@ -74,6 +119,47 @@ class Telegram:
             delivery_unknown=(method == "sendMessage" and code >= 500),
         ) from None
 
+    def _close_connection(self) -> None:
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+        self._conn = None
+
+    def _exchange(self, method: str, body: bytes) -> tuple[int, bytes]:
+        """One HTTPS round trip on a reused IPv4 keep-alive connection."""
+        for attempt in range(2):
+            idle = time.monotonic() - self._conn_used_at
+            # Never send a message on a long-idle socket the server may have dropped.
+            if self._conn is not None and idle > 30:
+                self._close_connection()
+            reused = self._conn is not None
+            if self._conn is None:
+                self._conn = _IPv4HTTPSConnection("api.telegram.org", timeout=self.timeout, context=self._ssl)
+            try:
+                self._conn.request("POST", f"{self._path}/{method}", body=body, headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Connection": "keep-alive",
+                })
+                response = self._conn.getresponse()
+                payload = response.read()
+                self._conn_used_at = time.monotonic()
+                if response.will_close:
+                    self._close_connection()
+                return response.status, payload
+            except (http.client.RemoteDisconnected, BrokenPipeError, ConnectionResetError, http.client.CannotSendRequest):
+                self._close_connection()
+                # A dropped reused socket is retried once, except for sends whose
+                # delivery could be ambiguous (the caller treats those as unknown).
+                if reused and attempt == 0 and method != "sendMessage":
+                    continue
+                raise
+            except BaseException:
+                self._close_connection()
+                raise
+        raise OSError("Telegram connection retry exhausted")
+
     def _post(self, method: str, data: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
             now = time.monotonic()
@@ -85,30 +171,23 @@ class Telegram:
                     time.sleep(wait)
             self._last_request_started = time.monotonic()
             try:
-                body = urllib.parse.urlencode(data).encode()
-                request = urllib.request.Request(
-                    f"{self.base_url}/{method}", data=body, method="POST"
-                )
-                with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                    payload = json.loads(response.read().decode())
-            except urllib.error.HTTPError as exc:
-                try:
-                    payload = json.loads(exc.read().decode())
-                except (ValueError, UnicodeError, OSError):
-                    payload = {}
-                finally:
-                    exc.close()
-                if not isinstance(payload, dict):
-                    payload = {}
-                code = payload.get("error_code", exc.code)
-                try:
-                    code = int(code)
-                except (TypeError, ValueError):
-                    code = exc.code
-                return self._handle_error(method, code, payload)
+                status, raw = self._exchange(method, urllib.parse.urlencode(data).encode())
             except (OSError, ValueError, UnicodeError, http.client.HTTPException):
                 # URLs contain credentials. Never expose exception text or causes.
                 raise TelegramError("Telegram transport failed; delivery status may be unknown", delivery_unknown=(method == "sendMessage")) from None
+            try:
+                payload = json.loads(raw.decode())
+            except (ValueError, UnicodeError):
+                payload = None
+            if status != 200:
+                if not isinstance(payload, dict):
+                    payload = {}
+                code = payload.get("error_code", status)
+                try:
+                    code = int(code)
+                except (TypeError, ValueError):
+                    code = status
+                return self._handle_error(method, code, payload)
             if not isinstance(payload, dict):
                 raise TelegramError("Telegram returned an invalid response", delivery_unknown=(method == "sendMessage"))
             if not payload.get("ok"):
@@ -167,6 +246,15 @@ class Telegram:
                     self._send_progress[key] = (next_chunk, last_message_id)
                 raise
             self._send_progress.pop(key, None)
+            try:
+                self.last_message_id = max(int(last_message_id), self.last_message_id or 0)
+            except (TypeError, ValueError):
+                pass
+            if self.on_sent is not None:
+                try:
+                    self.on_sent(last_message_id)
+                except Exception:
+                    pass
             return last_message_id
 
     def edit(self, message_id: int, text: str) -> None:

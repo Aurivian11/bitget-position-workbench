@@ -1,12 +1,16 @@
 """One durable live dashboard, with independent per-trade settlement receipts."""
 import json
+import time
 from trade_messages import TradeMessageBoard, UncertainDelivery, identity, same_lifetime
+
+RETIRED_TEXT = "<b>📊 BITGET · 旧看板</b>\n此看板已停止更新。"
 
 
 class AggregateTradeMessageBoard(TradeMessageBoard):
     def __init__(self, connect, channel, send, edit, is_missing, definitely_unsent,
-                 format_positions, format_closed, delete, format_opened=None):
+                 format_positions, format_closed, delete, format_opened=None, latest_message_id=None):
         self.format_positions = format_positions
+        self.latest_message_id = latest_message_id
         self.delete = delete
         self.format_opened = format_opened
         self._opening = None
@@ -86,6 +90,7 @@ class AggregateTradeMessageBoard(TradeMessageBoard):
             raise ValueError('Invalid live positions snapshot')
         identities = {}
         active = {}
+        fresh = False
         for key, item in positions.items():
             ident = identity(item)
             if ident in identities:
@@ -94,6 +99,8 @@ class AggregateTradeMessageBoard(TradeMessageBoard):
                 raise ValueError('Duplicate live position identity')
             identities[ident] = item
             existing = self._resolve(item, create=False)
+            if existing is None:
+                fresh = True
             if existing is None or existing['phase'] != 'closed':
                 active[key] = item
         # Preflight formatting/limits before any state or network side effects.
@@ -116,6 +123,17 @@ class AggregateTradeMessageBoard(TradeMessageBoard):
                 self._write(trade, phase='waiting')
         if row is None:
             return
+        # A newly opened trade gets a fresh board at the bottom of the chat (which
+        # notifies) instead of silently editing an older board buried above it.
+        if active and row['message_id'] and (fresh or self._buried(row['message_id'])) and any(
+                json.loads(self._resolve(item, create=False)['snapshot']).get('_aggregateSeen') is not True
+                for item in active.values()):
+            snapshot = json.loads(row['snapshot'])
+            retire = snapshot.get('retire_ids') or []
+            if str(row['message_id']) not in [str(x) for x in retire]:
+                retire.append(str(row['message_id']))
+            snapshot['retire_ids'] = retire
+            self._aggregate._write(row, snapshot=json.dumps(snapshot), message_id=None, sending=0)
         snapshot = json.loads(row['snapshot'])
         snapshot['positions'] = active
         self._aggregate._write(row, snapshot=json.dumps(snapshot))
@@ -128,14 +146,18 @@ class AggregateTradeMessageBoard(TradeMessageBoard):
                 self._aggregate._write(row, message_id=confirmed, sending=0)
                 del self._aggregate._confirmed[row['trade_key']]
             if not row['message_id']:
+                self._retire(row)
                 return
-            try:
-                self.edit(row['message_id'], payload)
-            except Exception as error:
-                if not self.is_missing(error):
-                    raise
-                self._aggregate._write(row, message_id=None, sending=0)
-                return
+            # No positions: remove the board entirely instead of showing an empty one.
+            # The next opening then creates a fresh board at the bottom (with a push).
+            snapshot = json.loads(row['snapshot'])
+            retire = snapshot.get('retire_ids') or []
+            if str(row['message_id']) not in [str(x) for x in retire]:
+                retire.append(str(row['message_id']))
+            snapshot['retire_ids'] = retire
+            self._aggregate._write(row, snapshot=json.dumps(snapshot), message_id=None, sending=0)
+            self._retire(row)
+            return
         # A persisted visibility marker is only set after the transport confirms.
         for item in active.values():
             trade = self._resolve(item, create=False)
@@ -143,6 +165,54 @@ class AggregateTradeMessageBoard(TradeMessageBoard):
             updated['_aggregateSeen'] = True
             self._write(trade, snapshot=json.dumps(updated))
         self._cleanup(row)
+        self._retire(row)
+
+    def _buried(self, message_id):
+        """True when a newer message (receipt, event) sits below the board."""
+        try:
+            board = int(message_id)
+        except (TypeError, ValueError):
+            return False
+        newer = []
+        if self.latest_message_id is not None:
+            newer.append(self.latest_message_id())
+        with self.connect() as db:
+            newer += [r[0] for r in db.execute(
+                'SELECT message_id FROM trade_message_delivery WHERE channel IN (?,?) AND message_id IS NOT NULL',
+                (self.channel + ':closed', self.channel + ':opened'))]
+        for value in newer:
+            try:
+                if value is not None and int(value) > board:
+                    return True
+            except (TypeError, ValueError):
+                continue
+        return False
+
+    def _retire(self, row):
+        """Remove boards superseded by a fresh one. Transient failures retry on later
+        cycles; after two minutes the old board is marked as moved instead."""
+        snapshot = json.loads(row['snapshot'])
+        since = snapshot.get('retire_since') or {}
+        while snapshot.get('retire_ids'):
+            mid = str(snapshot['retire_ids'][0])
+            if mid != str(row['message_id']):
+                try:
+                    self.delete(mid)
+                except Exception as error:
+                    if not self.is_missing(error):
+                        first = since.setdefault(mid, time.time())
+                        if time.time() - first < 120:
+                            snapshot['retire_since'] = since
+                            self._aggregate._write(row, snapshot=json.dumps(snapshot))
+                            return
+                        try:
+                            self.edit(mid, RETIRED_TEXT)
+                        except Exception:
+                            pass
+            snapshot['retire_ids'].pop(0)
+            since.pop(mid, None)
+            snapshot['retire_since'] = since
+            self._aggregate._write(row, snapshot=json.dumps(snapshot))
 
     def was_visible(self, item):
         row = self._resolve(item, closing=True, create=False)

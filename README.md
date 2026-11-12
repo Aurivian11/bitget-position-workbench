@@ -171,6 +171,18 @@ sudo systemctl restart bitget-position-monitor.service bitget-position-web.servi
 curl http://127.0.0.1:8091/healthz
 ```
 
+### 系统日志自动清理（可选）
+
+`deploy/journald/` 提供整机系统日志的大小和保留期限制：最多占用 500M，超过 14 天的条目丢弃，并由定时器每天 04:30 左右再清理一次。它作用于整台服务器的 journald，不只是本项目。
+
+```bash
+sudo install -Dm644 deploy/journald/50-size-limit.conf /etc/systemd/journald.conf.d/50-size-limit.conf
+sudo install -m644 deploy/journald/journal-cleanup.service deploy/journald/journal-cleanup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl restart systemd-journald
+sudo systemctl enable --now journal-cleanup.timer
+```
+
 备份应包含私密配置与运行数据。SQLite 数据库运行时请使用 SQLite 的在线备份接口，或停止相关服务后复制；不要仅复制正在写入的数据库文件。备份须放在私密位置，不属于公开仓库内容。
 
 ## 功能边界
@@ -203,7 +215,7 @@ app/
 config/
   .env.example                   # 仅占位示例，无真实凭据
   requirements.lock              # Python 运行依赖
-deploy/                          # systemd 与 Nginx 示例
+deploy/                          # systemd、Nginx 与系统日志清理示例
 docs/
   NOTIFICATIONS.md               # 中文配置获取教程
   images/                        # 模拟数据界面和空密码登录图
