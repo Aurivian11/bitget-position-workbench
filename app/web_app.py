@@ -14,6 +14,7 @@ from urllib.request import Request, urlopen
 
 import bot
 import web_admin
+from version import __version__
 
 ROOT = Path(__file__).resolve().parent
 STATIC_ROOT = ROOT / "web"
@@ -519,7 +520,7 @@ DATA = DashboardData(CONFIG)
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "BitgetDashboard/1.0"
+    server_version = f"BitgetDashboard/{__version__}"
 
     def log_message(self, fmt, *args):
         LOG.info("%s %s", self.address_string(), fmt % args)
