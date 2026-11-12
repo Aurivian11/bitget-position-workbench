@@ -1,0 +1,7 @@
+[Unit]
+Description=Daily system log cleanup (keep 14 days, max 500M)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/journalctl --rotate
+ExecStart=/usr/bin/journalctl --vacuum-time=14d --vacuum-size=500M

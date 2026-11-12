@@ -781,32 +781,12 @@ def format_event(kind, before, after) -> str:
     if kind == "opened":
         return format_opened_event(item)
 
-    coin = item.get("marginCoin")
-    lines = [
-        f"<b>[BITGET {EVENT_LABELS[kind]}]</b>",
-        f"合约：<code>{h(item.get('symbol'))}</code>",
-        f"方向：{h(side_name(item.get('holdSide')))}",
-    ]
+    lines = [f"<b>📊 BITGET · {h(EVENT_LABELS[kind])}</b>"]
     if before and after and kind in {"increased", "reduced"}:
-        lines.append(f"数量：<code>{h(before.get('total'))}</code> -> <code>{h(after.get('total'))}</code>")
-    else:
-        lines.append(f"数量：<code>{h(item.get('total'))}</code>")
-    lines += [
-        f"开仓均价：<code>{h(item.get('openPriceAvg'))}</code>",
-        f"标记价格：<code>{h(item.get('markPrice'))}</code>",
-        f"杠杆/模式：{h(item.get('leverage'))}x / {h(item.get('marginMode'))}",
-        f"持仓时间：{h(holding_duration(item))}",
-        f"未实现盈亏：<code>{h(item.get('unrealizedPL'))} {h(coin)}</code>",
-        f"已实现盈亏：<code>{h(item.get('achievedProfits'))} {h(coin)}</code>",
-        f"交易手续费：<code>{h(-abs(decimal(item.get('deductedFee'))))} {h(coin)}</code>",
-        f"手续费返佣（{fee_rebate_percent()}%）：<code>+{h(current_fee_rebate(item))} {h(coin)}</code>",
-        f"资金费：<code>{h(item.get('totalFee'))} {h(coin)}</code>",
-        f"<b>扣费后总盈亏（含返佣）：<code>{h(current_net_pnl(item))} {h(coin)}</code></b>",
-        f"浮盈收益率：<code>{h(roi(item))}</code>",
-        f"扣费后收益率：<code>{h(roi(item, net=True))}</code>",
-        f"止盈/止损：<code>{h(item.get('takeProfit'))}</code> / <code>{h(item.get('stopLoss'))}</code>",
-        f"时间：{h(datetime.now().astimezone().strftime('%Y-%m-%d %H:%M:%S %Z'))}",
-    ]
+        arrow = "⬆️" if kind == "increased" else "⬇️"
+        lines.append(f"{arrow} 数量：<code>{h(display_number(before.get('total')))}</code> → <code>{h(display_number(after.get('total')))}</code>")
+    lines.append(f"时间：{h(datetime.now(ZoneInfo('Asia/Shanghai')).strftime('%m-%d %H:%M:%S'))}（北京时间）")
+    lines += ["", *format_position_lines(item)]
     return "\n".join(lines)
 
 def format_summary(positions) -> str:
@@ -871,7 +851,7 @@ def display_net_roi(item) -> str:
     return prefix + format(abs(number), ".2f") + "%"
 
 
-def format_pnl_report(positions) -> str:
+def format_pnl_report(positions, compact: bool = False) -> str:
     now = datetime.now(ZoneInfo("Asia/Shanghai"))
     lines = [
         f"<b>📊 BITGET · 持仓（{len(positions)}）</b>",
@@ -890,7 +870,9 @@ def format_pnl_report(positions) -> str:
             lines.append(f"<b>合计净盈亏：</b><code>{h(display_number(net_totals[coin], money=True, signed=True))} {h(coin)}</code>")
 
     for item in positions.values():
-        lines += ["", *format_position_lines(item)]
+        detail = format_position_lines(item)
+        # Compact layout keeps many simultaneous positions inside one message.
+        lines += ["", *([detail[0], detail[1], detail[3], detail[6]] if compact else detail)]
     return "\n".join(lines)
 
 
@@ -1194,15 +1176,29 @@ def make_telegram_trade_board(store, telegram):
         if len(text) > 3800:
             raise ValueError("Combined positions exceed Telegram's message size limit")
         return text
+    def board_text(positions):
+        text = format_pnl_report(positions)
+        return checked(text if len(text) <= 3800 else format_pnl_report(positions, compact=True))
+    def latest_message_id():
+        try:
+            saved = int(store.get_meta("telegram_last_message_id") or 0)
+        except (TypeError, ValueError):
+            saved = 0
+        return max(saved, getattr(telegram, "last_message_id", None) or 0) or None
+    def remember(message_id):
+        if int(message_id) > (latest_message_id() or 0):
+            store.set_meta("telegram_last_message_id", str(int(message_id)))
+    telegram.on_sent = remember
     return AggregateTradeMessageBoard(
         lambda: nullcontext(store.db), "telegram", telegram.send,
         lambda mid, text: telegram.edit(int(mid), text),
         lambda error: isinstance(error, TelegramMessageMissing),
         lambda error: isinstance(error, TelegramError) and not error.delivery_unknown,
-        lambda positions: checked(format_pnl_report(positions)),
+        board_text,
         lambda item: checked(format_closed_event(item)),
         lambda mid: telegram.delete(int(mid)),
         format_opened=lambda item: checked(format_opened_event(item)),
+        latest_message_id=latest_message_id,
     )
 
 

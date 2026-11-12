@@ -105,7 +105,8 @@ class AggregateTests(unittest.TestCase):
     def test_empty_does_not_create_but_existing_is_cleared(self):
         self.board.sync({});self.assertEqual(self.log,[])
         self.board.sync(self.positions);self.board.sync({})
-        self.assertEqual(self.actions('edit')[-1],('edit','101','live '));self.assertEqual(len(self.actions('send')),1)
+        # An emptied account deletes the board instead of showing an empty one.
+        self.assertEqual(self.actions('delete')[-1],('delete','101'));self.assertEqual(len(self.actions('send')),1)
     def test_stale_closed_position_does_not_reappear(self):
         self.board.sync(self.positions);self.board.close(closed(self.a));self.board.sync(self.positions)
         self.assertEqual(self.actions('edit')[-1][2],'live ETHUSDT')
