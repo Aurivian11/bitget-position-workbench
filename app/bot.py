@@ -29,6 +29,7 @@ from uta_adapter import normalize_position, normalize_history, unwrap_list, appl
 from close_history import history_complete, history_matches, reconcile_closed_records
 
 from telegram_transport import Telegram, TelegramError, TelegramMessageMissing
+from version import __version__
 from telegram_board import sync_multipart_board
 
 ROOT = Path(__file__).resolve().parent
@@ -1302,7 +1303,7 @@ def run() -> None:
     )
     realtime_thread.start()
     failures, last_snapshot, first_loop = 0, 0.0, True
-    LOG.info("monitor started for %s (account API: %s)", ",".join(config.product_types), "UTA" if client.uta else "classic")
+    LOG.info("monitor v%s started for %s (account API: %s)", __version__, ",".join(config.product_types), "UTA" if client.uta else "classic")
     while not STOP:
         started = time.monotonic()
         try:
