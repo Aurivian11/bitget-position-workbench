@@ -37,6 +37,6 @@ jobs:
           git diff --exit-code -- app/web/index.html app/web/login.html
       - name: Check JavaScript syntax
         run: |
-          for script in app/web/assets/js/*.js; do
+          for script in app/web/assets/*.js; do
             node --check "$script"
           done

@@ -609,23 +609,12 @@ class Handler(BaseHTTPRequestHandler):
         files = {
             "/": ("index.html", "text/html; charset=utf-8"),
             "/index.html": ("index.html", "text/html; charset=utf-8"),
-            "/styles.css": ("assets/css/dashboard.css", "text/css; charset=utf-8"),
-            "/app.js": ("assets/js/dashboard.js", "application/javascript; charset=utf-8"),
-            "/lucide.js": ("assets/vendor/lucide.js", "application/javascript; charset=utf-8"),
-            "/brand.ico": ("assets/brand.ico", "image/x-icon"),
-            "/favicon.ico": ("assets/brand.ico", "image/x-icon"),
+            "/assets/app.css": ("assets/app.css", "text/css; charset=utf-8"),
+            "/assets/app.js": ("assets/app.js", "application/javascript; charset=utf-8"),
+            "/assets/login.js": ("assets/login.js", "application/javascript; charset=utf-8"),
+            "/assets/icon.svg": ("assets/icon.svg", "image/svg+xml"),
+            "/favicon.ico": ("assets/icon.svg", "image/svg+xml"),
         }
-        files.update({
-            "/assets/css/access.css": ("assets/css/access.css", "text/css; charset=utf-8"),
-            "/assets/js/access.js": ("assets/js/access.js", "application/javascript; charset=utf-8"),
-            "/assets/js/session.js": ("assets/js/session.js", "application/javascript; charset=utf-8"),
-            "/assets/css/dashboard.css": ("assets/css/dashboard.css", "text/css; charset=utf-8"),
-            "/assets/css/workspace.css": ("assets/css/workspace.css", "text/css; charset=utf-8"),
-            "/assets/js/dashboard.js": ("assets/js/dashboard.js", "application/javascript; charset=utf-8"),
-            "/assets/js/workspace.js": ("assets/js/workspace.js", "application/javascript; charset=utf-8"),
-            "/assets/vendor/lucide.js": ("assets/vendor/lucide.js", "application/javascript; charset=utf-8"),
-            "/assets/brand.ico": ("assets/brand.ico", "image/x-icon"),
-        })
         target = files.get(path)
         if not target:
             self.write_bytes(404, b"Not found", "text/plain; charset=utf-8")

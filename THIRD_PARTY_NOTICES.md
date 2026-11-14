@@ -2,16 +2,9 @@
 
 本文件记录随源码分发的第三方资源与安装时使用的依赖。它不为本项目自有代码额外授予许可证。
 
-## Lucide 0.468.0
+## 界面图标
 
-- 文件：`app/web/assets/vendor/lucide.js`
-- 项目：https://github.com/lucide-icons/lucide
-- 原版本：https://github.com/lucide-icons/lucide/tree/0.468.0
-- 许可证：ISC
-- 随附原文：[LICENSES/Lucide-0.468.0.txt](LICENSES/Lucide-0.468.0.txt)
-- 官方许可来源：https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/LICENSE
-
-原 JavaScript 文件的版本和版权许可头保持不变。Lucide 的上游许可说明部分图标源自 Cole Bemis 的 Feather（MIT）；另附 [Feather MIT 许可](LICENSES/Feather-MIT.txt)，来源为官方 [Feather v4.29.2 LICENSE](https://github.com/feathericons/feather/blob/v4.29.2/LICENSE)。两份文件保留各自上游的版权年份与声明。
+自 v1.2.0 起，网页不再随附 `lucide.js`。界面图标是写在 `app/web/assets/app.js` 中的 24×24 线性 SVG 路径，按 [Lucide](https://github.com/lucide-icons/lucide)（ISC）及其上游 [Feather](https://github.com/feathericons/feather)（MIT）的线性图标风格绘制。为稳妥起见，仓库继续保留 [Lucide ISC 许可](LICENSES/Lucide-0.468.0.txt) 与 [Feather MIT 许可](LICENSES/Feather-MIT.txt) 原文。
 
 ## websocket-client 1.8.0
 

@@ -1,5 +1,35 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="theme-color" content="#f7f8fc"><meta name="robots" content="noindex,nofollow"><title>登录 · Bitget 持仓工作台</title><link rel="icon" href="assets/brand.ico"><link rel="stylesheet" href="assets/css/access.css?v=0465f59a9d1a"><script src="assets/js/access.js?v=0465f59a9d1a" defer></script></head>
-<body class="access-page"><main class="access-shell"><a class="access-brand" href="./" aria-label="Bitget 持仓工作台"><span class="access-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 11h21l-6-6M28 21H7l6 6M21 11 11 21"/></svg></span><span><strong>Bitget</strong><small>持仓工作台</small></span></a>
-<section class="access-card" aria-labelledby="access-title"><div class="access-lock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M6 10h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2ZM12 14v3"/></svg></div><p class="access-eyebrow">PRIVATE WORKSPACE</p><h1 id="access-title">欢迎回到持仓工作台<span>.</span></h1><p class="access-description">登录后查看账户、持仓与通知设置。</p>
-<p class="access-status" id="access-status" role="status" hidden></p><form id="access-form"><label for="access-password">管理密码</label><div class="access-password-wrap"><input id="access-password" name="password" type="password" autocomplete="current-password" required maxlength="200" placeholder="输入现有管理密码" aria-describedby="access-error"><button id="access-toggle" type="button" aria-label="显示密码" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div><p id="access-error" class="access-error" role="alert" hidden></p><button id="access-submit" class="access-submit" type="submit"><span>登录工作台</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></form><div class="access-note"><span></span>整个工作台均需登录后访问</div></section><footer class="access-footer">Bitget 账户只读连接 · 北京时间 UTC+8</footer></main></body></html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#eef1f8">
+<meta name="robots" content="noindex,nofollow">
+<title>登录 · Bitget 持仓工作台</title>
+<link rel="icon" href="assets/icon.svg?v=f64e1daaa529" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css?v=f64e1daaa529">
+<script src="assets/login.js?v=f64e1daaa529" defer></script>
+</head>
+<body>
+<div class="backdrop" aria-hidden="true"><span class="orb orb-a"></span><span class="orb orb-b"></span><span class="orb orb-c"></span><span class="orb orb-d"></span></div>
+<main class="login-wrap">
+  <section class="glass login-card" aria-labelledby="login-title">
+    <span class="brand-mark lg"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 16.5 9.5 11l3.5 3 6.5-7.5"/></svg></span>
+    <h1 id="login-title">欢迎回来</h1>
+    <p class="lead">登录后查看 Bitget 持仓、收益与通知状态。</p>
+    <div class="login-note" id="login-note" hidden></div>
+    <form id="login-form">
+      <label class="field-label" for="pw">管理密码</label>
+      <div class="pw">
+        <input class="input" id="pw" type="password" autocomplete="current-password" required maxlength="256" placeholder="输入管理密码" autofocus>
+        <button class="pw-toggle" id="pw-toggle" type="button" aria-label="显示密码"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+      <p class="field-error" id="login-error" role="alert" hidden></p>
+      <button class="btn primary block" id="login-btn" type="submit">登录</button>
+    </form>
+    <div class="login-foot"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.6 3.2 7.8 7.5 9 4.3-1.2 7.5-4.4 7.5-9V6L12 3Z"/><path d="m9 12 2 2 4-4"/></svg>只读监控 · 凭据仅保存在你的服务器</div>
+  </section>
+</main>
+</body>
+</html>

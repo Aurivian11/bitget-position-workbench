@@ -1,93 +1,117 @@
 <!doctype html>
-<html lang="zh-CN" data-session-state="checking">
+<html lang="zh-CN">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"><meta name="theme-color" content="#f7f8fb">
-<title>Bitget · 持仓工作台</title><meta name="description" content="合约账户资产、收益表现、实时持仓与完整交易记录。">
-<link rel="icon" href="assets/brand.ico"><link rel="stylesheet" href="assets/css/dashboard.css?v=0465f59a9d1a"><link rel="stylesheet" href="assets/css/workspace.css?v=0465f59a9d1a"><link rel="stylesheet" href="assets/css/access.css?v=0465f59a9d1a"><script src="assets/js/session.js?v=0465f59a9d1a" defer></script><script src="assets/vendor/lucide.js" defer></script><script src="assets/js/dashboard.js?v=0465f59a9d1a" defer></script><script src="assets/js/workspace.js?v=0465f59a9d1a" defer></script>
-</head><body>
-<section id="session-shield" class="session-shield" role="status" aria-live="polite"><div><strong>正在确认登录状态</strong><p>如长时间没有响应，请刷新页面重试。</p><button type="button" hidden>重新验证</button><noscript>请启用 JavaScript 后访问持仓工作台。</noscript></div></section>
-<a class="skip-link" href="#account">跳到账户总览</a>
-<aside class="sidebar" aria-label="工作台导航">
-<a class="workspace-brand" href="#account" data-view="dashboard"><span class="workspace-mark"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 11h21l-6-6M28 21H7l6 6M21 11 11 21"/></svg></span><span><strong>Bitget</strong><small>持仓工作台</small></span></a>
-<div class="workspace-label">WORKSPACE <span>只读账户</span></div><div class="sidebar-navigation"><div class="nav-caption">账户与交易</div>
-<nav class="primary-nav" aria-label="账户导航">
-<a class="active" href="#account" data-view="dashboard" aria-current="page"><i data-lucide="layout-dashboard"></i><span>账户总览</span></a>
-<a href="#positions" data-view="dashboard"><i data-lucide="layers"></i><span>当前持仓</span><b id="nav-position-count">—</b></a>
-<a href="#ledger" data-view="dashboard"><i data-lucide="list-filter"></i><span>交易记录</span><b id="nav-trade-count">—</b></a>
-<a href="#performance" data-view="dashboard"><i data-lucide="chart-no-axes-combined"></i><span>收益分析</span></a></nav>
-<div class="nav-caption">通知与管理</div><nav class="manage-nav" aria-label="管理导航">
-<a href="#notifications" data-view="notifications"><i data-lucide="bell"></i><span>通知中心</span></a>
-<a href="#settings" data-view="settings"><i data-lucide="sliders-horizontal"></i><span>通知配置</span><i data-lucide="lock-keyhole" class="nav-lock"></i></a>
-<a href="#guide" data-view="guide"><i data-lucide="book-open"></i><span>配置教程</span></a></nav>
-</div><div class="sidebar-help"><span class="help-icon"><i data-lucide="sparkles"></i></span><strong>让每笔变动，及时抵达</strong><p>连接你的通知渠道，<br>随时掌握持仓变化。</p><a href="#guide" data-view="guide">查看配置指南<i data-lucide="arrow-up-right"></i></a></div>
-<div class="sidebar-foot"><span class="quiet-dot"></span><span>Bitget 账户只读连接</span><i data-lucide="shield-check"></i></div></aside>
-<header class="topbar"><div class="topbar-inner"><div class="breadcrumb"><span>工作台</span><i data-lucide="chevron-right"></i><strong id="workspace-title">账户总览</strong></div><div class="header-tools"><span class="timezone-label">UTC+8 · 北京时间</span><label class="currency-control"><span class="currency-symbol">账户</span><select id="currency" aria-label="切换账户与结算币种"><option>USDT</option></select></label><a href="#settings" data-view="settings" class="account-avatar" aria-label="管理通知配置"><i data-lucide="settings-2"></i></a><button class="site-logout" id="site-logout" type="button" aria-label="退出持仓工作台"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4M15 7l5 5-5 5M9 12h11"/></svg><span>退出</span></button></div></div></header>
-<main><div id="dashboard-view" class="workspace-view"><section id="account" class="account-section" aria-labelledby="account-title">
-<div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span>YOUR TRADING, IN FOCUS</div><h1 id="account-title">看清持仓，掌握每笔变动<span class="heading-dot">.</span></h1><div class="account-context"><span id="account-product">USDT 本位永续</span><span class="context-divider"></span><span>实时持仓与交易表现，尽在一处</span></div></div><div class="heading-actions"><div class="sync-information"><span id="connection" class="connection" role="status"><i></i><span>正在连接</span></span><span class="as-of">更新于 <time id="as-of">—</time></span></div><a class="secondary-button heading-config" href="#settings" data-view="settings"><i data-lucide="sliders-horizontal"></i>通知配置</a><button id="refresh" class="refresh-button" type="button"><i data-lucide="refresh-cw"></i><span>刷新数据</span></button></div></div>
-<div id="error-strip" class="error-strip" role="alert" hidden><i data-lucide="triangle-alert"></i><span></span><button id="retry" type="button">重新连接<i data-lucide="arrow-right"></i></button></div>
-<div class="account-selection"><div><span class="account-selection-label">当前账户</span><div id="account-switcher" class="account-switcher" role="group" aria-label="切换账户"><button type="button" disabled>正在读取账户</button></div></div><span class="account-selection-note">各账户与币种分别统计</span></div>
-<div class="metric-grid">
-<article class="metric-card asset-card"><div class="metric-heading"><span id="equity-label">账户总权益</span><span class="currency-label currency-tag">USDT</span></div><div id="equity" class="equity-value metric-value">—</div><div class="metric-foot"><span>可用余额</span><strong id="available">—</strong></div><div class="asset-watermark" aria-hidden="true"><i data-lucide="wallet"></i></div></article>
-<article class="metric-card hero-stat"><div class="metric-heading"><span id="net-period-label">累计净盈亏</span><span class="metric-icon"><i data-lucide="trending-up"></i></span></div><strong id="net-profit" class="metric-value">—</strong><div class="metric-foot"><span id="rebate-note">含 <b id="rebate-rate">—</b> 手续费返佣</span><span id="cfd-net-note" hidden>CFD 结算记录 · 无手续费返佣</span></div></article>
-<article class="metric-card hero-stat"><div class="metric-heading"><span>交易胜率</span><span class="metric-icon"><i data-lucide="target"></i></span></div><strong id="win-rate" class="metric-value">—</strong><div class="metric-foot"><span id="win-record">等待交易样本</span></div></article>
-<article class="metric-card hero-stat"><div class="metric-heading"><span>盈亏因子</span><span class="metric-icon"><i data-lucide="scale"></i></span></div><strong id="profit-factor" class="metric-value">—</strong><div class="metric-foot"><span id="score-label">暂无样本</span><span class="metric-sample" id="factor-sample">—</span></div></article>
-</div></section>
-<section id="positions" class="positions-section" aria-labelledby="positions-title"><div class="section-heading"><div class="section-title"><h2 id="positions-title">当前持仓</h2><span id="position-heading-count" class="count-badge">—</span><span id="position-updated" class="section-note">数据同步中</span></div><div class="exposure-summary"><span>持仓净盈亏 <strong id="open-net">—</strong></span><span>保证金 <strong id="position-margin-summary">—</strong></span></div></div>
-<div id="position-list" class="position-list"><div class="position-loading">正在读取持仓数据…</div></div>
-<div id="position-empty" class="position-empty" hidden><div class="empty-illustration" aria-hidden="true"><span class="empty-window"><i data-lucide="layers"></i><span></span><span></span></span><span class="empty-check"><i data-lucide="check"></i></span></div><div class="empty-copy"><span class="empty-label">POSITION STATUS</span><h3>当前暂无持仓</h3><p>新持仓会自动显示在这里，盈亏与费用实时更新。</p></div><span class="flat-status"><i></i>账户空仓</span></div></section>
-<section id="performance" class="curve-panel surface chart-section" aria-labelledby="performance-title">
-<div class="chart-header"><div class="chart-heading"><h2 id="performance-title">收益曲线</h2><span class="chart-legend"><i></i>累计净盈亏</span></div><div class="range-control" role="group" aria-label="已平仓交易统计区间"><button data-range="7" aria-pressed="false">7 天</button><button data-range="30" aria-pressed="false">30 天</button><button class="selected" data-range="all" aria-pressed="true">全部</button></div></div>
-<div class="chart-stage"><div id="chart-content" class="chart-content"><canvas id="performance-chart" tabindex="0" aria-label="按北京时间每日汇总的累计净盈亏与每日盈亏，使用左右方向键逐日查看"></canvas><div id="chart-tip" class="chart-tip" role="status" aria-live="polite" hidden></div><div id="chart-empty" class="chart-empty" hidden><i data-lucide="chart-no-axes-combined"></i><strong>该区间暂无交易</strong><span>平仓后，收益轨迹将在这里呈现</span></div></div></div><div id="chart-scroll-note" class="chart-scroll-note" hidden><i data-lucide="move-horizontal"></i><span>左右滑动查看每天的数据</span></div>
-<div class="chart-caption"><span id="range-dates">正在读取统计区间</span><span class="daily-key"><i></i>每日盈亏</span><span id="range-trades">— 笔已平仓交易</span></div>
-</section>
-<section class="performance-strip" aria-label="交易表现汇总"><div class="strip-intro"><span class="strip-icon"><i data-lucide="chart-pie"></i></span><div><strong>交易表现</strong><span id="metric-period">全部交易</span></div></div><div class="strip-stat"><span><i class="stat-dot profit"></i>盈利交易 <b id="wins">—</b> 笔</span><strong id="gross-profit">—</strong></div><div class="strip-stat"><span><i class="stat-dot loss"></i>亏损交易 <b id="losses">—</b> 笔</span><strong id="gross-loss">—</strong></div><div class="strip-stat"><span>平均每笔收益 <small class="currency-label">USDT</small></span><strong id="average">—</strong></div></section>
-<section id="ledger" class="ledger-section" aria-labelledby="ledger-title"><div class="section-heading"><div class="section-title"><h2 id="ledger-title">交易记录</h2><span id="trade-heading-count" class="count-badge">—</span><span class="section-note">每一笔交易，清晰可查</span></div><span id="history-start" class="history-start">记录起始 —</span></div><div class="ledger surface">
-<div class="ledger-controls"><label class="search-field"><i data-lucide="search"></i><input id="search" type="search" placeholder="搜索合约名称" aria-label="搜索合约" autocomplete="off"></label><div class="filter-group" aria-label="交易筛选"><label><i data-lucide="arrow-up-down"></i><select id="side" aria-label="交易方向"><option value="all">全部方向</option><option value="long">做多</option><option value="short">做空</option></select></label><label><i data-lucide="sliders-horizontal"></i><select id="result" aria-label="交易盈亏"><option value="all">全部盈亏</option><option value="win">盈利</option><option value="loss">亏损</option><option value="flat">持平</option></select></label><label class="mobile-sort"><i data-lucide="list-filter"></i><select id="ledger-order" aria-label="记录排序"><option value="latest">最近平仓</option><option value="earliest">最早平仓</option><option value="profit-high">盈亏从高到低</option><option value="profit-low">盈亏从低到高</option></select></label></div><span id="result-count" class="result-count">— 条记录</span></div>
-<div class="ledger-table-wrap"><table><thead><tr><th>合约 / 方向</th><th aria-sort="descending"><button class="sort active" data-sort="closedAt"><span id="ledger-time-label">平仓时间</span><i data-lucide="arrow-down"></i></button></th><th class="num">数量</th><th class="num">开仓价格</th><th class="num">平仓价格</th><th class="num">持仓时间</th><th class="num">手续费 / 返佣</th><th class="num"><button class="sort" data-sort="netPnl">净盈亏<i data-lucide="chevrons-up-down"></i></button></th><th class="action-col"><span class="sr-only">交易详情</span></th></tr></thead><tbody id="trades"></tbody></table></div>
-<div id="ledger-loading" class="ledger-loading" role="status"><i data-lucide="loader-circle"></i><span>正在同步交易记录</span></div><div id="ledger-empty" class="ledger-empty" hidden><span class="empty-search-icon"><i data-lucide="search-x"></i></span><h3>没有找到相关交易</h3><p>试试其他合约名称，或调整筛选条件。</p><button id="reset-filter" type="button">清除筛选<i data-lucide="arrow-right"></i></button></div>
-<div class="ledger-footer"><span id="page-copy">正在读取交易记录</span><div class="pagination"><button id="prev" class="icon-button" aria-label="上一页"><i data-lucide="chevron-left"></i></button><span id="page">1 / 1</span><button id="next" class="icon-button" aria-label="下一页"><i data-lucide="chevron-right"></i></button></div></div></div></section>
-</div><section id="notifications-view" class="workspace-view" hidden aria-labelledby="notifications-title">
-<div class="view-heading"><div><p class="eyebrow">STAY CONNECTED</p><h1 id="notifications-title">每次变动，都有迹可循<span class="heading-dot">.</span></h1><p class="view-description">查看通知渠道与持仓事件，掌握配置及投递处理状态。</p></div><a class="primary-button" href="#settings" data-view="settings"><i data-lucide="sliders-horizontal"></i>管理通知</a></div>
-<div id="channel-status-grid" class="channel-status-grid"><div class="surface loading-panel">正在读取通知状态…</div></div>
-<div class="surface event-panel"><div class="panel-heading"><div><h2>持仓变动</h2><p>按监控记录时间排列，保留开仓、加减仓与平仓事件。</p></div><button id="refresh-events" class="secondary-button" type="button"><i data-lucide="refresh-cw"></i>刷新</button></div>
-<div class="events-toolbar"><label class="search-field"><i data-lucide="search"></i><input id="event-search" type="search" placeholder="搜索合约" aria-label="搜索持仓事件"></label><select id="event-type" class="plain-select" aria-label="事件类型"><option value="all">全部事件</option><option value="opened">开仓</option><option value="increased">加仓</option><option value="reduced">减仓</option><option value="closed">平仓</option><option value="updated">参数变更</option></select><span id="events-count" class="subtle">— 条记录</span></div>
-<div id="event-list" class="event-list" aria-live="polite"><div class="loading-panel">正在读取持仓事件…</div></div><div class="ledger-footer"><span>展示最近 100 条监控事件</span><div class="pagination"><button id="event-prev" class="icon-button" type="button" aria-label="上一页事件"><i data-lucide="chevron-left"></i></button><span id="event-page">1 / 1</span><button id="event-next" class="icon-button" type="button" aria-label="下一页事件"><i data-lucide="chevron-right"></i></button></div></div><div class="panel-note"><i data-lucide="info"></i><span>已处理不代表设备已读；按规则跳过的事件，以通道设置为准。</span></div></div></section><section id="settings-view" class="workspace-view" hidden aria-labelledby="settings-title">
-<div class="view-heading"><div><p class="eyebrow">MAKE IT YOURS</p><h1 id="settings-title">通知，按你的习惯<span class="heading-dot">.</span></h1><p class="view-description">选择接收渠道、持仓消息与提醒方式，让有用的信息及时抵达。</p></div><a class="text-link" href="#guide" data-view="guide"><i data-lucide="book-open"></i>如何获取配置</a></div>
-<div id="https-required" class="notice warning" hidden><i data-lucide="lock-keyhole"></i><div><strong>请使用加密入口管理配置</strong><p>密钥配置仅在 HTTPS 管理入口开放。</p><p>请使用管理员配置的 HTTPS 地址重新打开工作台。</p></div></div>
-<div id="login-panel" class="login-layout" hidden><article class="login-card surface"><span class="login-icon"><i data-lucide="lock-keyhole"></i></span><h2>进入通知管理</h2><p>使用管理密码登录持仓工作台。账户数据与通知设置均受保护。</p><form id="login-form"><label class="field-label" for="admin-password">管理密码</label><div class="password-input"><input id="admin-password" type="password" autocomplete="current-password" required maxlength="200" placeholder="输入管理密码"><button type="button" id="toggle-password" aria-label="显示密码"><i data-lucide="eye"></i></button></div><p id="login-error" class="field-error" role="alert" hidden></p><button class="primary-button login-submit" type="submit"><i data-lucide="log-in"></i>登录管理</button></form><div class="login-foot"><i data-lucide="shield-check"></i><span>凭据仅保存于你的服务器</span></div></article>
-<div class="login-explainer"><span class="eyebrow">CONNECTED, YOUR WAY</span><h2>三个渠道，<br>一种清晰的掌控感。</h2><p>开仓后更新持仓卡片，加减仓与平仓及时提醒；<br>再为手机配上你喜欢的 Bark 声音。</p><div class="channel-pills"><span><i data-lucide="send"></i>Telegram</span><span><i data-lucide="messages-square"></i>Discord</span><span><i data-lucide="bell-ring"></i>Bark</span></div><a href="#guide" data-view="guide" class="text-link">第一次配置？从这里开始<i data-lucide="arrow-up-right"></i></a></div></div>
-<div id="settings-content" hidden><div class="settings-session"><span><i data-lucide="shield-check"></i>已登录管理<span class="session-divider">·</span><span id="config-revision">读取配置中</span></span><button id="logout" class="text-button" type="button">退出登录<i data-lucide="log-out"></i></button></div><div id="settings-feedback" class="notice" role="status" hidden></div><form id="settings-form"><div id="settings-channels" class="settings-grid"></div><div class="settings-bottom"><div class="save-description"><strong id="dirty-status">当前配置已同步</strong><span>密钥留空保留原值。保存后监控会短暂重连并自动恢复。</span></div><div class="save-actions"><button id="discard-settings" class="secondary-button" type="button">撤销修改</button><button id="save-settings" class="primary-button" type="submit"><i data-lucide="check"></i>保存并应用</button></div></div></form></div></section><section id="guide-view" class="workspace-view" hidden aria-labelledby="guide-title"><div class="view-heading"><div><p class="eyebrow">A LITTLE GUIDANCE</p><h1 id="guide-title">从连接，到第一条通知<span class="heading-dot">.</span></h1><p class="view-description">按渠道获取配置。使用占位示例说明，教程不会展示你的实际凭据。</p></div><a class="primary-button" href="#settings" data-view="settings"><i data-lucide="sliders-horizontal"></i>前往配置</a></div><div class="guide-intro surface"><span class="guide-intro-icon"><i data-lucide="route"></i></span><div><h2>三步完成连接</h2><p>获取凭据 <span>→</span> 填写通知配置 <span>→</span> 保存并确认生效</p></div><span class="guide-intro-tag">现有持仓监控持续保留</span></div><div id="guide-content" class="guide-grid"><article class="guide-card surface" id="guide-telegram"><div class="channel-heading"><span class="channel-icon telegram"><i data-lucide="send"></i></span><div><h2>Telegram</h2><p>机器人 Token 与目标 Chat ID</p></div></div><ol>
-<li><strong>创建自己的机器人。</strong>在 Telegram 找到官方 <code>@BotFather</code>，发送 <code>/newbot</code>，按提示设置名称与用户名，保存返回的 Bot Token。</li>
-<li><strong>让机器人能向你发送消息。</strong>私聊机器人并点击“开始”；群聊则将机器人加入目标群，确认允许发送消息。</li>
-<li><strong>获取目标 Chat ID。</strong>现有配置可直接沿用页面中的 ID。新建、尚未接入任何程序或 webhook 的机器人，可先给它发一条消息，再在自己的浏览器打开 <code>https://api.telegram.org/bot&lt;你的Token&gt;/getUpdates</code>，读取返回的 <code>message.chat.id</code>。群 ID 通常为负数，需完整复制。</li>
-<li><strong>填写并保存。</strong>把 Token 与 Chat ID 填入通知配置，开启需要的持仓卡片、加减仓或平仓提醒，保存后等待“配置已生效”。</li></ol>
-<p class="guide-note">已接入其他程序的机器人不要另开 getUpdates 轮询，也不要删除 webhook。用户名不能代替私人 Chat ID；公开超级群或频道可通过官方 getChat 查询已知目标。Token 留空会保留服务器原值。</p>
-<details><summary>收不到消息时检查什么？</summary><p>确认已点击开始、机器人未被移出或禁言、Chat ID 属于正确目标。若更换机器人或群组，程序会建立新消息状态，避免编辑旧目标中的持仓卡片。网页保存只验证格式，不会自动发送测试消息。</p></details>
-<a class="guide-source" href="https://core.telegram.org/bots/tutorial" target="_blank" rel="noopener noreferrer">Telegram 官方机器人教程<i data-lucide="external-link"></i></a></article>
-<article class="guide-card surface" id="guide-discord"><div class="channel-heading"><span class="channel-icon discord"><i data-lucide="messages-square"></i></span><div><h2>Discord</h2><p>目标文字频道的 Webhook</p></div></div><ol>
-<li><strong>找到服务器集成设置。</strong>进入要接收通知的 Discord 服务器，打开“服务器设置 → 集成”。需要拥有管理 Webhook 的权限。</li>
-<li><strong>创建 Webhook。</strong>新建 Webhook，为它设置名称并选择接收消息的文字频道。每个 Webhook 都对应明确的发送位置。</li>
-<li><strong>复制完整地址。</strong>点击“复制 Webhook URL”。地址通常类似 <code>https://discord.com/api/webhooks/编号/凭据</code>，整段都需要保密，不要添加 <code>/github</code> 后缀。</li>
-<li><strong>设置持仓消息。</strong>在通知配置中启用 Discord，填入完整地址，选择持仓卡片和额外交易提醒，保存并等待生效。</li></ol>
-<p class="guide-note">持仓卡片更新原有消息，不会按刷新频率连续发送新消息。平台限流时会自动等待，设置 1 秒不代表每秒一定完成编辑。</p>
-<details><summary>Webhook 被删除或没有权限怎么办？</summary><p>确认目标频道存在、Webhook 未被删除。重新创建后在网页填写新地址并保存。地址留空表示保留；关闭通道会保留已有凭据。如果只是恢复原 Webhook 的权限、地址没有变化，请先关闭 Discord 并保存、等待生效，再开启并保存，让通知重新连接。没有修改的保存不会重启通知。</p></details>
-<a class="guide-source" href="https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks" target="_blank" rel="noopener noreferrer">Discord 官方 Webhook 教程<i data-lucide="external-link"></i></a></article>
-<article class="guide-card surface" id="guide-bark"><div class="channel-heading"><span class="channel-icon bark"><i data-lucide="bell-ring"></i></span><div><h2>Bark</h2><p>手机开仓提醒与自定义铃声</p></div></div><ol>
-<li><strong>打开手机 Bark。</strong>允许系统通知。使用自建服务时，先在 Bark 中添加并选择对应服务器，完成设备注册。</li>
-<li><strong>拆分个人推送地址。</strong>例如 <code>https://push.example.com/DEVICE_KEY/测试内容</code>：服务器地址是 <code>https://push.example.com</code>，设备 Key 是 <code>DEVICE_KEY</code>，不要复制后面的测试内容。</li>
-<li><strong>填写本项目的配置。</strong>服务器地址与设备 Key 分开填写。当前服务器上的 Bark 可以使用已配置的本机地址；手机端注册服务器必须与 Key 对应。</li>
-<li><strong>选择提醒方式。</strong>设置声音名称、通知分组、持续响铃开关与成交核对间隔，保存后等待生效。</li></ol>
-<p class="guide-note">本项目的 Bark 用于开仓方向成交提醒；不是持仓看板，也不发送平仓通知。不同服务器注册的设备 Key 不应混用。关闭期间的旧成交不会在重新启用后集中补发。</p>
-<details><summary>声音或推送没有出现怎么办？</summary><p>检查手机通知权限、专注模式、Bark 当前服务器以及设备 Key。自定义声音需要先在 Bark 中导入，名称应与导入后的名称一致。网页显示接口接受，只表示推送服务接受请求，不代表手机已展示或已读。</p></details>
-<a class="guide-source" href="https://bark.day.app/#/tutorial" target="_blank" rel="noopener noreferrer">Bark 官方使用教程<i data-lucide="external-link"></i></a></article>
-<article class="guide-card surface" id="guide-bitget"><div class="channel-heading"><span class="channel-icon"><i data-lucide="key-round"></i></span><div><h2>Bitget 账户连接</h2><p>现有账户已接入，通知配置无需重建 API</p></div></div><ol>
-<li><strong>需要新账户时再创建 API。</strong>登录 Bitget 的 API 管理，创建 API Key，设置并保管 Passphrase，保存 Key、Secret 和 Passphrase 三项。</li>
-<li><strong>选择只读权限。</strong>监控读取账户、持仓与历史记录，无需开启交易、划转或提现权限。可将允许访问的 IP 绑定为服务器实际出口 IP。</li>
-<li><strong>由服务器管理员更换连接。</strong>账户凭据保存在项目的 <code>config/.env</code>，对应 <code>BITGET_API_KEY</code>、<code>BITGET_API_SECRET</code>、<code>BITGET_API_PASSPHRASE</code>。本网页仅开放通知渠道管理。</li>
-<li><strong>核对账户模式。</strong>经典账户与统一账户使用不同 API；应按实际账户模式配置并验证持仓同步。不要为了获取数据而开启交易权限。</li></ol>
-<p class="guide-note">网页只展示账户与持仓，不提供买卖下单。变更账户前请先保留原配置与业务数据，避免不同账户的历史记录混用。</p>
-<a class="guide-source" href="https://www.bitget.com/docs/uta/rest-api" target="_blank" rel="noopener noreferrer">Bitget 官方 API 接入说明<i data-lucide="external-link"></i></a></article>
-<article class="guide-card guide-wide surface"><div class="channel-heading"><span class="channel-icon"><i data-lucide="circle-help"></i></span><div><h2>读懂页面上的状态</h2><p>把保存、加载和投递三个阶段分开看</p></div></div><p class="guide-note">“已保存”表示配置已写入服务器；“配置已生效”表示监控加载新配置并完成一次同步；“最近接口确认”来自通知平台的响应，不代表设备已读。通道关闭时保留密钥，重新开启不集中补发停用期间旧事件。修改同一份配置发生冲突时，页面会要求重新读取，保护其他页面刚保存的更改。</p></article></div></section><footer class="page-footer"><div class="footer-brand"><span class="footer-mark">B</span><span>Bitget 持仓工作台</span><span class="footer-divider"></span><span>账户只读</span></div><div class="footer-meta"><span id="footer-sync">最近同步 —</span><span id="footer-window">统计窗口 —</span><span>北京时间 <time id="clock">--:--:--</time></span></div></footer>
-<div hidden aria-hidden="true"><span id="nav-view-label"></span><span id="open-count"></span><span id="chart-total"></span><span id="factor-large"></span><span id="quality-fill"></span><span id="quality-marker"></span><span id="position-summary"></span><span id="exposure-label"></span><span id="position-net-summary"></span></div>
-</main><div id="toast" class="toast" role="status" hidden></div><dialog id="trade-drawer" aria-labelledby="drawer-title"><div class="drawer-shell"><header class="drawer-header"><div><p>TRANSACTION DETAILS</p><h2 id="drawer-title">交易详情</h2></div><button id="close-drawer" class="icon-button" aria-label="关闭交易详情"><i data-lucide="x"></i></button></header><div id="drawer-content"></div><footer class="drawer-footer"><i data-lucide="shield-check"></i><span>数据来自 Bitget · 只读账户</span></footer></div></dialog>
-</body></html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#eef1f8">
+<meta name="robots" content="noindex,nofollow">
+<title>Bitget 持仓工作台</title>
+<link rel="icon" href="assets/icon.svg?v=f64e1daaa529" type="image/svg+xml">
+<link rel="stylesheet" href="assets/app.css?v=f64e1daaa529">
+<script src="assets/app.js?v=f64e1daaa529" defer></script>
+</head>
+<body>
+<div class="backdrop" aria-hidden="true"><span class="orb orb-a"></span><span class="orb orb-b"></span><span class="orb orb-c"></span><span class="orb orb-d"></span></div>
+
+<header class="topbar glass">
+  <a class="brand" href="#overview" aria-label="返回总览">
+    <span class="brand-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 16.5 9.5 11l3.5 3 6.5-7.5"/></svg></span>
+    <span class="brand-text"><strong>Bitget</strong><em>持仓工作台</em></span>
+  </a>
+  <nav class="tabs" id="tabs" aria-label="主导航">
+    <span class="tab-indicator" aria-hidden="true"></span>
+    <a href="#overview" data-tab="overview">总览</a>
+    <a href="#positions" data-tab="positions">持仓</a>
+    <a href="#history" data-tab="history">交易记录</a>
+    <a href="#notifications" data-tab="notifications">通知</a>
+    <a href="#settings" data-tab="settings">设置</a>
+  </nav>
+  <div class="top-actions">
+    <span class="live-chip" id="live-chip" role="status"><i></i><span id="live-text">连接中</span></span>
+    <button class="icon-btn" id="refresh-btn" type="button" title="立即刷新" aria-label="立即刷新"><i data-icon="refresh"></i></button>
+    <button class="icon-btn" id="logout-btn" type="button" title="退出登录" aria-label="退出登录"><i data-icon="logout"></i></button>
+  </div>
+</header>
+
+<main class="main" id="main">
+  <!-- 总览 -->
+  <section class="view" data-view="overview" aria-labelledby="h-overview">
+    <div class="view-head"><div><h1 id="h-overview">你好</h1><p id="ov-sub">正在读取账户数据…</p></div><div class="head-chips" id="ov-acct"></div></div>
+    <div class="ov-grid">
+      <article class="glass card hero" id="ov-hero"><div class="sk sk-s"></div><div class="sk sk-l"></div><div class="sk sk-m"></div></article>
+      <article class="glass card perf" id="ov-perf"><div class="sk sk-s"></div><div class="sk sk-ring"></div></article>
+      <article class="glass card curve" id="ov-curve"><div class="sk sk-s"></div><div class="sk sk-chart"></div></article>
+      <article class="glass card ov-pos" id="ov-pos"><div class="sk sk-s"></div><div class="sk sk-m"></div><div class="sk sk-m"></div></article>
+      <article class="glass card ov-his" id="ov-his"><div class="sk sk-s"></div><div class="sk sk-m"></div><div class="sk sk-m"></div></article>
+    </div>
+  </section>
+
+  <!-- 持仓 -->
+  <section class="view" data-view="positions" aria-labelledby="h-positions">
+    <div class="view-head">
+      <div><h1 id="h-positions">当前持仓</h1><p>价格每秒刷新 · 净盈亏已扣除手续费与资金费</p></div>
+      <div class="head-chips" id="pos-totals"></div>
+    </div>
+    <div class="pos-grid" id="pos-grid"><div class="glass card"><div class="sk sk-s"></div><div class="sk sk-l"></div><div class="sk sk-m"></div></div></div>
+  </section>
+
+  <!-- 交易记录 -->
+  <section class="view" data-view="history" aria-labelledby="h-history">
+    <div class="view-head"><div><h1 id="h-history">交易记录</h1><p id="his-sub">已平仓交易与收益统计</p></div><div class="head-chips" id="his-acct"></div></div>
+    <div id="his-alert"></div>
+    <div class="stat-strip" id="his-stats"></div>
+    <div class="toolbar">
+      <label class="search glass"><i data-icon="search"></i><input id="his-q" type="search" placeholder="搜索合约，如 BTC" aria-label="搜索合约" autocomplete="off"></label>
+      <div class="seg" data-seg="side" role="group" aria-label="方向筛选"><button type="button" data-v="all" class="on">全部方向</button><button type="button" data-v="long">做多</button><button type="button" data-v="short">做空</button></div>
+      <div class="seg" data-seg="result" role="group" aria-label="结果筛选"><button type="button" data-v="all" class="on">全部结果</button><button type="button" data-v="win">盈利</button><button type="button" data-v="loss">亏损</button></div>
+    </div>
+    <div class="glass table-card"><div id="his-table"></div><div class="pager" id="his-pager"></div></div>
+  </section>
+
+  <!-- 通知 -->
+  <section class="view" data-view="notifications" aria-labelledby="h-notifications">
+    <div class="view-head">
+      <div><h1 id="h-notifications">通知中心</h1><p>渠道状态与最近 100 条持仓事件</p></div>
+      <div class="head-actions"><button class="btn" id="ev-refresh" type="button"><i data-icon="refresh"></i>刷新</button><a class="btn primary" href="#settings"><i data-icon="sliders"></i>通知设置</a></div>
+    </div>
+    <div id="n-banner"></div>
+    <div class="ch-grid" id="ch-grid"><div class="glass card"><div class="sk sk-s"></div><div class="sk sk-m"></div></div></div>
+    <div class="glass table-card">
+      <div class="table-head">
+        <div><strong>持仓事件</strong><span class="sub" id="ev-count">—</span></div>
+        <div class="toolbar">
+          <label class="search inset"><i data-icon="search"></i><input id="ev-q" type="search" placeholder="搜索合约" aria-label="搜索持仓事件" autocomplete="off"></label>
+          <select id="ev-type" class="select" aria-label="事件类型"><option value="all">全部事件</option><option value="opened">开仓</option><option value="increased">加仓</option><option value="reduced">减仓</option><option value="closed">平仓</option><option value="updated">参数变更</option></select>
+        </div>
+      </div>
+      <div class="ev-list" id="ev-list" aria-live="polite"></div>
+      <div class="pager" id="ev-pager"></div>
+    </div>
+  </section>
+
+  <!-- 设置 -->
+  <section class="view" data-view="settings" aria-labelledby="h-settings">
+    <div class="view-head"><div><h1 id="h-settings">通知设置</h1><p id="set-meta">选择接收渠道与提醒方式</p></div></div>
+    <div id="set-notice"></div>
+    <form id="set-form" autocomplete="off">
+      <div class="set-grid" id="set-grid"><div class="glass card"><div class="sk sk-s"></div><div class="sk sk-m"></div><div class="sk sk-m"></div></div></div>
+      <p class="set-note" id="set-note"></p>
+      <div class="savebar glass" id="savebar">
+        <div><strong id="save-title">有未保存的更改</strong><span class="sub">密钥留空表示保留原值，保存后监控会短暂重连。</span></div>
+        <div class="save-actions"><button type="button" class="btn" id="set-reload">撤销</button><button type="submit" class="btn primary" id="set-save"><i data-icon="check"></i>保存并应用</button></div>
+      </div>
+    </form>
+  </section>
+</main>
+
+<nav class="dock glass" aria-label="底部导航">
+  <a href="#overview" data-tab="overview"><i data-icon="overview"></i>总览</a>
+  <a href="#positions" data-tab="positions"><i data-icon="layers"></i>持仓</a>
+  <a href="#history" data-tab="history"><i data-icon="receipt"></i>记录</a>
+  <a href="#notifications" data-tab="notifications"><i data-icon="bell"></i>通知</a>
+  <a href="#settings" data-tab="settings"><i data-icon="sliders"></i>设置</a>
+</nav>
+<div class="toast glass" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

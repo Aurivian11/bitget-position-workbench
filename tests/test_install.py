@@ -127,13 +127,13 @@ def request(path,proxy=True,cookie=None):
  conn.request('GET',path,headers=headers);r=conn.getresponse();result=(r.status,r.read());conn.close();return result
 paths=['/api/dashboard','/api/positions/live','/api/events','/api/notification-status','/api/admin/settings']
 try:
- status,body=request('/');assert status==200 and b'access.js' in body and b'dashboard.js' not in body
+ status,body=request('/');assert status==200 and b'assets/login.js' in body and b'assets/app.js' not in body
  assert all(request(path)[0]==401 for path in paths)
  assert all(request(path,proxy=False)[0]==403 for path in paths)
  assert request('/healthz',proxy=False)==(200,b'{"ok":true}')
  token=admin._signed_session(admin._auth());cookie=admin.COOKIE+'='+token
  assert all(request(path,cookie=cookie)[0]==200 for path in paths)
- status,body=request('/',cookie=cookie);assert status==200 and b'dashboard.js' in body
+ status,body=request('/',cookie=cookie);assert status==200 and b'assets/app.js' in body
 finally:
  server.shutdown();server.server_close();worker.join(5)
 """)

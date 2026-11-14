@@ -2,9 +2,9 @@
 
 **把 Bitget 合约与 CFD 账户、持仓变化及多渠道通知放进一个私密工作台。**
 
-当前版本：**v1.1.0** · [更新日志](CHANGELOG.md)
+当前版本：**v1.2.0** · [更新日志](CHANGELOG.md)
 
-Bitget Position Workbench 是一个可自行部署的只读持仓监控项目。它将账户权益、实时持仓、已平仓交易、收益统计和通知配置整合在浅色网页中，并通过 Telegram、Discord 与 Bark 提醒持仓变化。整个工作台及账户数据接口均需登录。
+Bitget Position Workbench 是一个可自行部署的只读持仓监控项目。它将账户权益、实时持仓、已平仓交易、收益统计和通知配置整合在浅色毛玻璃风格的网页中，并通过 Telegram、Discord 与 Bark 提醒持仓变化。整个工作台及账户数据接口均需登录。
 
 项目适合希望在自己的服务器管理监控与通知的个人用户。网页不提供下单、划转或提现操作，也不包含交易策略。
 
@@ -18,15 +18,14 @@ Bitget Position Workbench 是一个可自行部署的只读持仓监控项目。
 
 | 模块 | 内容 |
 | --- | --- |
-| 账户总览 | 切换合约与 CFD 账户，按结算币种分别展示权益、可用余额和交易统计 |
-| 当前持仓 | 方向、数量、可确认的杠杆与保证金、标记价格或 CFD 平仓参考价、持仓或记录时长及费用详情 |
-| 交易与收益 | 历史记录筛选、交易详情、收益曲线、胜率与盈亏因子 |
-| 通知中心 | 最近事件、待处理情况、渠道配置状态与监控同步心跳 |
-| 通知配置 | 独立启停渠道、选择交易提醒、调整持仓卡片刷新与 Bark 参数 |
-| 配置教程 | Bitget 只读 API、Telegram Token / Chat ID、Discord Webhook、Bark Key 获取方法 |
+| 总览 | 账户权益、可用与冻结金额、胜率环形图、累计净收益曲线、持仓与最近平仓摘要；合约与 CFD 账户一键切换，按结算币种分别统计 |
+| 持仓 | 每个持仓一张卡片：方向、杠杆、开仓均价与标记价格（CFD 为平仓参考价）、净盈亏与收益率、手续费、资金费或隔夜利息、止盈止损，价格每秒刷新 |
+| 交易记录 | 净收益、胜率、盈亏比等统计，按合约搜索、按方向和盈亏筛选，分页浏览 |
+| 通知 | 三个渠道的启用与待处理状态、监控同步心跳、最近 100 条持仓事件 |
+| 设置 | 独立启停渠道、选择交易提醒、调整持仓卡片刷新与 Bark 参数，每个渠道附获取配置的步骤 |
 | 私密访问 | 全站登录、可撤销会话、CSRF 校验、登录限流、过期退出与浏览器返回保护 |
 
-页面适配桌面和手机。未知或暂时不可用的数据显示为“—”或错误提示，避免把读取失败误认为零余额、零收益或空仓。
+页面适配桌面和手机：桌面使用顶部悬浮导航，手机切换为底部导航栏。未知或暂时不可用的数据显示为“—”或错误提示，避免把读取失败误认为零余额、零收益或空仓。
 
 ### 三种通知方式
 
@@ -40,7 +39,7 @@ CFD 可通过 `BITGET_CFD_ENABLED=1` 单独启用，使用独立持仓接口与�
 
 ### CFD 网页账户
 
-启用 CFD 并完成同步后，登录工作台，在“当前账户”按钮组或顶栏账户选择器中选择 **USD · CFD**。CFD 与 USDT 合约的余额、收益曲线、胜率和交易记录分别统计，不进行美元与 USDT 换算或混合累加。账户使用接口返回的结算币种。
+启用 CFD 并完成同步后，登录工作台，在“总览”或“交易记录”页右上角的账户切换中选择 **USD · CFD**。CFD 与 USDT 合约的余额、收益曲线、胜率和交易记录分别统计，不进行美元与 USDT 换算或混合累加。账户使用接口返回的结算币种。
 
 CFD 持仓数量以“手”显示，保留 `XAUUSD.s`、`XAUUSD.pro` 等完整品种代码。报价使用多仓的 Bid 或空仓的 Ask，页面标为“平仓参考价”；持仓通过监控快照同步，页面目标读取间隔为 2 秒。缺失的保证金、收益率、手续费或净收益显示为“—”。
 
@@ -51,7 +50,7 @@ CFD 持仓数量以“手”显示，保留 `XAUUSD.s`、`XAUUSD.pro` 等完整�
 
 - Python 标准库提供 HTTP 服务、SQLite 存储、配置验证与会话管理。
 - `websocket-client` 提供 WebSocket 支持。
-- 原生 HTML、CSS、JavaScript 与 Canvas，无前端打包器或 Node.js 运行时要求。
+- 原生 HTML、CSS、JavaScript 与内联 SVG 图表，无前端框架、打包器或 Node.js 运行时要求，不加载任何外部资源。
 - Nginx 提供 HTTPS 反向代理，systemd 管理监控和网页进程。
 - 支持经典账户与统一账户模式；需按实际账户类型配置并核对接口可用性。
 
@@ -163,7 +162,7 @@ sudo systemctl status bitget-position-monitor.service bitget-position-web.servic
 sudo journalctl -u bitget-position-monitor.service -n 80 --no-pager
 sudo journalctl -u bitget-position-web.service -n 80 --no-pager
 
-# 修改 HTML 片段或前端资源后重建两张页面
+# 修改前端资源后，更新两张页面中的资源版本号
 sudo .venv/bin/python -B tools/build_web.py
 
 # 加载代码更新
@@ -211,9 +210,8 @@ app/
   telegram_*.py / discord_*.py    # 持仓卡片、事件投递与传输
   bark_*.py                      # 开仓成交队列与推送
   web/
-    fragments/                   # 分页面 HTML 源码
-    assets/                      # CSS、JavaScript、图标
-    index.html / login.html      # 生成的工作台与登录页
+    index.html / login.html      # 工作台与登录页
+    assets/                      # app.css、app.js、login.js、icon.svg
 config/
   .env.example                   # 仅占位示例，无真实凭据
   requirements.lock              # Python 运行依赖
@@ -223,7 +221,7 @@ docs/
   NOTIFICATIONS.md               # 中文配置获取教程
   images/                        # 模拟数据界面和空密码登录图
 tools/
-  build_web.py                   # 生成 HTML 与资源版本号
+  build_web.py                   # 为页面资源写入版本号
   init_admin.py                  # 初始化网页管理密码
 tests/                           # 隔离回归测试
 LICENSES/                        # 第三方许可文本
@@ -244,6 +242,6 @@ PYTHONPATH=app .venv/bin/python -B app/test_bot.py
 
 ## 第三方依赖与项目关系
 
-前端图标使用 Lucide，Python 运行依赖包括 websocket-client。第三方组件的来源与许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+前端图标为项目内置的 SVG 线性图标，Python 运行依赖包括 websocket-client。第三方组件的来源与许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 本项目为独立开发的监控工具，与 Bitget、Telegram、Discord、Bark 等平台没有官方隶属关系。平台名称仅用于说明兼容的服务。
