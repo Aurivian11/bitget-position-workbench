@@ -1,0 +1,20 @@
+#!/usr/sbin/nft -f
+# Restrict the dashboard port to loopback and the HTTPS reverse-proxy network.
+#
+# Only needed when WEB_HOST is not 127.0.0.1, for example when a containerised
+# proxy (Nginx Proxy Manager, Caddy, Traefik ...) reaches the dashboard through
+# a Docker bridge gateway. Replace 172.18.0.0/16 with that proxy's network and
+# 8091 with WEB_PORT if you changed it.
+#
+# The rules live in their own table, so loading this file never flushes Docker
+# or other firewall rules.
+table inet bitget_guard
+delete table inet bitget_guard
+table inet bitget_guard {
+	chain input {
+		type filter hook input priority filter - 5; policy accept;
+		tcp dport 8091 iifname "lo" accept
+		tcp dport 8091 ip saddr 172.18.0.0/16 accept
+		tcp dport 8091 counter drop
+	}
+}

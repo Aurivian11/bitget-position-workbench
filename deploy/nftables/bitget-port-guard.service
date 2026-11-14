@@ -1,0 +1,14 @@
+[Unit]
+Description=Restrict the Bitget dashboard port to loopback and the HTTPS proxy network
+Wants=network-pre.target
+After=network-pre.target
+Before=network.target bitget-position-web.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/nftables-bitget-guard.nft
+ExecStop=/usr/sbin/nft delete table inet bitget_guard
+
+[Install]
+WantedBy=multi-user.target

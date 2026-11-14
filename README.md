@@ -2,7 +2,7 @@
 
 **把 Bitget 合约与 CFD 账户、持仓变化及多渠道通知放进一个私密工作台。**
 
-当前版本：**v1.2.0** · [更新日志](CHANGELOG.md)
+当前版本：**v1.2.1** · [更新日志](CHANGELOG.md)
 
 Bitget Position Workbench 是一个可自行部署的只读持仓监控项目。它将账户权益、实时持仓、已平仓交易、收益统计和通知配置整合在浅色毛玻璃风格的网页中，并通过 Telegram、Discord 与 Bark 提醒持仓变化。整个工作台及账户数据接口均需登录。
 
@@ -102,7 +102,7 @@ sudo chmod 0600 config/.env
 | `BITGET_WEB_ORIGIN` | 正式 HTTPS 来源，例如 `https://monitor.example.com`，不含路径 |
 | `BITGET_WEB_TRUSTED_PROXIES` | 直接连接网页进程的可信代理 IP；同机 Nginx 使用默认 `127.0.0.1,::1` |
 
-示例默认监听 `127.0.0.1:8091`，网页固定挂载在 `/bitget/`。请使用自己的域名，不要直接沿用示例域名。容器化代理应填写其实际来源 IP，并限制网页端口的可达范围。
+示例默认监听 `127.0.0.1:8091`，网页固定挂载在 `/bitget/`。请使用自己的域名，不要直接沿用示例域名。容器化代理应填写其实际来源 IP，并限制网页端口的可达范围（见下方[限制网页端口](#限制网页端口可选)）。
 
 通知凭据默认留空、渠道关闭，可在登录后通过网页配置。手续费返佣比例默认是 `0`，只有确认自己实际享有返佣时才调整；历史范围还受 Bitget 接口可返回数据的限制。
 
@@ -184,6 +184,23 @@ sudo systemctl restart systemd-journald
 sudo systemctl enable --now journal-cleanup.timer
 ```
 
+### 限制网页端口（可选）
+
+默认 `WEB_HOST=127.0.0.1` 时，网页端口只在本机可达，不需要这一步。如果为了让容器里的反向代理访问而把 `WEB_HOST` 设为 `0.0.0.0` 或 Docker 网关地址，端口会同时暴露在公网。`deploy/nftables/` 提供一张独立的 nftables 表：只允许本机和代理所在网段连接网页端口，其余连接直接丢弃。它不会清空 Docker 或其他防火墙规则，也不影响访问者从哪个 IP 或网络节点打开你的域名。
+
+先把示例中的 `172.18.0.0/16` 改成代理容器所在网段（`docker network inspect <网络名>` 可查看），端口与 `WEB_PORT` 保持一致：
+
+```bash
+sudo install -m644 deploy/nftables/bitget-port-guard.nft.example /etc/nftables-bitget-guard.nft
+sudo nano /etc/nftables-bitget-guard.nft
+sudo nft -c -f /etc/nftables-bitget-guard.nft
+sudo install -m644 deploy/nftables/bitget-port-guard.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now bitget-port-guard.service
+```
+
+开机时服务会在网页进程之前加载规则。撤销时执行 `sudo systemctl disable --now bitget-port-guard.service`。
+
 备份应包含私密配置与运行数据。SQLite 数据库运行时请使用 SQLite 的在线备份接口，或停止相关服务后复制；不要仅复制正在写入的数据库文件。备份须放在私密位置，不属于公开仓库内容。
 
 ## 功能边界
@@ -215,7 +232,7 @@ app/
 config/
   .env.example                   # 仅占位示例，无真实凭据
   requirements.lock              # Python 运行依赖
-deploy/                          # systemd、Nginx 与系统日志清理示例
+deploy/                          # systemd、Nginx、端口限制与系统日志清理示例
 VERSION / CHANGELOG.md            # 当前版本号与更新日志
 docs/
   NOTIFICATIONS.md               # 中文配置获取教程
