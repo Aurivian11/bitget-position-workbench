@@ -11,6 +11,12 @@ import notification_settings
 
 LOG = logging.getLogger("bitget-position-tg")
 
+# Telegram answers sustained one-per-second edits with long flood waits (observed
+# 1587s), which also blocks trade events. Keep board edits well under that rate.
+MIN_BOARD_SECONDS = 3.0
+SLOW_BOARD_SECONDS = 10.0
+SLOW_AFTER_LIMIT_SECONDS = 1800.0
+
 
 class TelegramLiveDispatcher:
     def __init__(self, store_factory, telegram, positions_provider, format_event,
@@ -22,7 +28,8 @@ class TelegramLiveDispatcher:
         self.positions_provider = positions_provider
         self.format_event = format_event
         self.sync_pnl_message = sync_pnl_message
-        self.update_seconds = max(1.0, float(update_seconds))
+        self.update_seconds = max(MIN_BOARD_SECONDS, float(update_seconds))
+        self._board_slow_until = 0.0
         self.next_board_at = 0.0
         self._closed_cursor = 0
         self._condition = threading.Condition()
@@ -176,7 +183,10 @@ class TelegramLiveDispatcher:
             self.sync_pnl_message(
                 store, self.telegram, positions, force_new=False,
             )
-        self.next_board_at = board_started + self.update_seconds
+        interval = self.update_seconds
+        if time.monotonic() < self._board_slow_until:
+            interval = max(interval, SLOW_BOARD_SECONDS)
+        self.next_board_at = board_started + interval
 
     def _run(self):
         store, deadline, failures = None, 0.0, 0
@@ -204,7 +214,9 @@ class TelegramLiveDispatcher:
                     delay = max(1.0, float(error.retry_after))
                     deadline = time.monotonic() + delay
                     delayed = True
-                    self._warn("rate limit", delay)
+                    self._board_slow_until = time.monotonic() + delay + SLOW_AFTER_LIMIT_SECONDS
+                    # Always visible: a long flood wait delays every Telegram message.
+                    LOG.warning("Telegram rate limited; all Telegram messages paused for %.0fs", delay)
                 except Exception as error:
                     failures += 1
                     delay = min(30.0, 2.0 ** min(failures, 5))

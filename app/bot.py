@@ -1264,7 +1264,7 @@ def start_telegram_dispatcher(config):
         trade_board_factory=make_telegram_trade_board,
     )
     dispatcher.start()
-    LOG.info("Telegram PnL source: live Bitget positions (%.1fs target)", config.telegram_update_seconds)
+    LOG.info("Telegram PnL source: live Bitget positions (%.1fs target)", dispatcher.update_seconds)
     return dispatcher
 
 

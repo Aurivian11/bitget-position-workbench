@@ -59,9 +59,10 @@ class NotificationCadenceTests(unittest.TestCase):
     def test_board_keeps_requested_sixty_second_interval(self):
         result=scenario(fixed,60,cycles=125,events=0)
         self.assertEqual(result['provider'],[100.,160.,220.])
-    def test_existing_one_second_behavior_is_preserved(self):
-        result=scenario(fixed,1,cycles=5,events=0)
-        self.assertEqual(result['provider'],[100.,101.,102.,103.,104.])
+    def test_one_second_request_is_raised_to_three_second_floor(self):
+        # Sustained one-second edits trigger long Telegram flood waits.
+        result=scenario(fixed,1,cycles=7,events=0)
+        self.assertEqual(result['provider'],[100.,103.,106.])
     def test_events_continue_with_board_disabled(self):
         result=scenario(fixed,3600,board=False)
         self.assertEqual(result['sent'],[101.,102.])
