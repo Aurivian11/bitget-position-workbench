@@ -57,7 +57,7 @@ def _bool(value): return str(value).lower() in {'1', 'true', 'yes'}
 def defaults():
     e = base_env()
     return {'revision': 0, 'updatedAt': None, 'channels': {
-        'telegram': {'enabled': bool(e.get('TELEGRAM_BOT_TOKEN') and e.get('TELEGRAM_CHAT_ID')), 'token': e.get('TELEGRAM_BOT_TOKEN',''), 'chat_id': e.get('TELEGRAM_CHAT_ID',''), 'board_enabled': True, 'events': list(EVENTS), 'update_seconds': float(e.get('TELEGRAM_UPDATE_SECONDS','1'))},
+        'telegram': {'enabled': bool(e.get('TELEGRAM_BOT_TOKEN') and e.get('TELEGRAM_CHAT_ID')), 'token': e.get('TELEGRAM_BOT_TOKEN',''), 'chat_id': e.get('TELEGRAM_CHAT_ID',''), 'board_enabled': True, 'events': list(EVENTS), 'update_seconds': float(e.get('TELEGRAM_UPDATE_SECONDS','10'))},
         'discord': {'enabled': bool(e.get('DISCORD_WEBHOOK_URL')), 'webhook': e.get('DISCORD_WEBHOOK_URL',''), 'board_enabled': True, 'events': list(EVENTS), 'update_seconds': int(e.get('DISCORD_UPDATE_SECONDS','10'))},
         'bark': {'enabled': bool(e.get('BARK_KEY')), 'base': e.get('BARK_BASE','http://127.0.0.1:8080'), 'key': e.get('BARK_KEY',''), 'sound': e.get('BARK_SOUND','123'), 'call': _bool(e.get('BARK_CALL','1')), 'group': e.get('BARK_GROUP','bitget-orders'), 'reconcile_seconds': float(e.get('BARK_RECONCILE_SECONDS','30'))},
     }}
